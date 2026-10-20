@@ -125,7 +125,7 @@ jobs:
             adb install /tmp/MedReminder-old.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
-            adb install -r release/MedReminder-1.0.4.apk
+            adb install -r release/MedReminder-1.0.5.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
             adb shell pidof com.combustible12.medreminder
@@ -134,5 +134,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.4-build.${{ github.run_number }}"
-          gh release create "$TAG" release/MedReminder-1.0.4.apk --title "MedReminder 1.0.4" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
+          TAG="v1.0.5-build.${{ github.run_number }}"
+          python3 - "$TAG" <<'PYTHON'
+          import hashlib, json, sys
+          from pathlib import Path
+          apk = Path("release/MedReminder-1.0.5.apk")
+          Path("release/update.json").write_text(json.dumps({"name": "MedReminder 1.0.5", "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "url": "https://github.com/combustible12/MedReminder/releases/download/" + sys.argv[1] + "/" + apk.name}))
+          PYTHON
+          gh release create "$TAG" release/MedReminder-1.0.5.apk release/update.json --title "MedReminder 1.0.5" --notes-file docs/RELEASE_NOTES.md --latest --target "${{ github.sha }}"

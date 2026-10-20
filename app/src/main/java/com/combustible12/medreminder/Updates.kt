@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.*
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -53,6 +54,16 @@ internal class AppUpdater(private val context: Context) {
         error("更新跳转过多")
     }
     fun latest(): Release {
+        // Release assets do not consume the anonymous GitHub API quota.
+        return runCatching {
+            val c = connect("https://github.com/combustible12/MedReminder/releases/latest/download/update.json")
+            val manifest = try { JSONObject(c.inputStream.bufferedReader().use { it.readText() }) } finally { c.disconnect() }
+            val digest = manifest.getString("sha256")
+            require(digest.matches(Regex("[0-9a-fA-F]{64}"))) { "更新校验信息无效" }
+            Release(manifest.getString("url"), digest, manifest.getString("name"))
+        }.getOrElse { latestFromApi() }
+    }
+    private fun latestFromApi(): Release {
         val c = connect("https://api.github.com/repos/combustible12/MedReminder/releases?per_page=100")
         val releases = try { JSONArray(c.inputStream.bufferedReader().use { it.readText() }) } finally { c.disconnect() }
         for (i in 0 until releases.length()) {
