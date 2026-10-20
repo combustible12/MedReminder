@@ -3,8 +3,8 @@
 - 便签首页底部新增 40dp 圆角“一键更新并升级”，浅蓝紫配色；模拟器截图已检查。
 - 下载校验 SHA-256、包名、版本和固定签名；安装授权返回后自动继续。
 - 新增按钮入口、当前版本拒绝重复安装、无效安装包拒绝的设备测试。
-- Android 9 首轮发现 GET_SIGNING_CERTIFICATES 读取归档证书不一致，已改用兼容固定签名的 GET_SIGNATURES，等待最终流水线验证。
-- 最终签名覆盖安装与发布由工作流检查通过后执行；数据库结构不变。
+- Android 9 首轮发现 GET_SIGNING_CERTIFICATES 读取归档证书不一致，已改用兼容固定签名的 GET_SIGNATURES，最终 Android 9 / 15 各 6 项功能测试全部通过。
+- 6 项 JVM 测试通过；最终签名包从 1.0.0 覆盖安装并正常启动，已发布 1.0.1；数据库结构不变。\n- 最终工作流：https://github.com/combustible12/MedReminder/actions/runs/39372595508\n- 根据用户要求，后续仅保留 Android 16（API 36）一个测试环境；本次未声称已完成荣耀 MagicOS 真机测试。
 
 以下为 1.0.0 历史验收记录。
 
