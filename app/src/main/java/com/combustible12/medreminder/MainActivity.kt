@@ -115,6 +115,7 @@ fun NotebookApp(app: MedApplication) {
                 })
             } else if (tab == 0) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    item(key = "app-update") { AppUpdateButton() }
                     if (state.cards.isEmpty()) item { Column(Modifier.fillMaxWidth().padding(top = 50.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("从一张空白卡片开始", color = Quiet); Spacer(Modifier.height(4.dp)); Text("点击右下角 ＋ 添加", color = Quiet, fontSize = 13.sp) } }
                     items(state.cards, key = { it.id }) { card ->
                         NoteCardView(card, state, { cardEditor = card }, { groupEditor = GroupEditor(card.id) }, { groupEditor = GroupEditor(card.id, it) }, { itemEditor = ItemEditor(it.id) }, { itemEditor = ItemEditor(it.groupId, it) }, { fullImage = it }, {
@@ -123,7 +124,6 @@ fun NotebookApp(app: MedApplication) {
                             }
                         }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("排列条目", state.items.filter { it.groupId == group.id }.map { it.id to (state.medicines.firstOrNull { med -> med.id == it.medicineId }?.name ?: "") }, repo::reorderItems) }, permissionProblem)
                     }
-                    item { AppUpdateButton() }
                 }
             } else { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
         }
