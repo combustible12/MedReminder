@@ -28,7 +28,11 @@ class DatabaseTest {
             val g2 = repo.saveGroup(NoteGroup(cardId = cards[1].id, name = "B"), Reminder(0, 9, 30, true))
             val g3 = repo.saveGroup(NoteGroup(cardId = cards[0].id, name = "C"), Reminder(0))
             repo.reorderGroups(listOf(g3, g1))
-            val image = java.io.File(context.filesDir, "acceptance-image").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            val source = java.io.File(context.cacheDir, "acceptance-source.png")
+            val bitmap = android.graphics.Bitmap.createBitmap(4, 4, android.graphics.Bitmap.Config.ARGB_8888)
+            source.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            val image = java.io.File(ImageStore(context).import(android.net.Uri.fromFile(source)))
+            source.delete()
             val i1 = repo.saveItem(g1, null, null, "药品 A", "", "1片", image.absolutePath)
             val med = repo.dao.medicines().first().single()
             val i2 = repo.saveItem(g2, null, med.id, med.name, "", "2片", med.image)
@@ -60,7 +64,9 @@ class DatabaseTest {
             assertEquals(2, repo.dao.medicinePeriods(med.id).size)
             repo.dao.deleteMedicine(med.id)
             assertTrue(repo.dao.items().first().isEmpty()); assertTrue(repo.dao.periods().first().isEmpty())
-            image.delete()
+            ImageStore(context).removeIfUnused(image.absolutePath, db)
+            assertFalse(image.exists())
+            Unit
         } finally { db.close(); context.deleteDatabase(filename) }
     }
 }

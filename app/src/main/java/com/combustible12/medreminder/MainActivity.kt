@@ -308,8 +308,10 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val imported = remember { mutableListOf<String>() }
+    DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) scope.launch { loading = true; try { image = ImageStore(app).import(uri) } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } }
+        if (uri != null) scope.launch { loading = true; try { image = ImageStore(app).import(uri).also { imported.add(it) } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } }
     }
     EditorDialog(if (editor.item == null) "添加项目" else "编辑项目", dismiss, {
         if (loading) error = "正在保存图片" else if ((selected?.name ?: name).isBlank()) error = "请填写名称" else save(selectedId, selected?.name ?: name, selected?.specification ?: spec, dose, selected?.image ?: image)
@@ -347,7 +349,9 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) scope.launch { loading = true; try { image = ImageStore(app).import(uri) } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
+    val imported = remember { mutableListOf<String>() }
+    DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) scope.launch { loading = true; try { image = ImageStore(app).import(uri).also { imported.add(it) } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
     EditorDialog("编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, image = image)) }) {
         Text("名称、规格和图片会同步用于引用此药品的首页条目。各条目的用量保持独立。", fontSize = 12.sp, color = Quiet)
         OutlinedTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())

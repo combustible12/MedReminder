@@ -29,6 +29,7 @@ class UiTest {
         compose.onNodeWithText("药品或护理名称").performTextInput("测试护理")
         compose.onNodeWithText("每次用量").performTextInput("1次")
         compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("添加项目").fetchSemanticsNodes().isEmpty() }
         compose.waitUntil(5000) { compose.onAllNodesWithText("测试护理").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("测试护理").assertIsDisplayed()
         val file = java.io.File(compose.activity.getExternalFilesDir("qa"), "home-optional-fields.png")
