@@ -1,1 +1,79 @@
-cGFja2FnZSBjb20uY29tYnVzdGlibGUxMi5tZWRyZW1pbmRlcgoKaW1wb3J0IGFuZHJvaWR4LmNvbXBvc2UudWkuZ2VvbWV0cnkuT2Zmc2V0CmltcG9ydCBhbmRyb2lkeC5jb21wb3NlLnVpLnRlc3QuKgppbXBvcnQgYW5kcm9pZHguY29tcG9zZS51aS50ZXN0Lmp1bml0NC5jcmVhdGVBbmRyb2lkQ29tcG9zZVJ1bGUKaW1wb3J0IGtvdGxpbnguY29yb3V0aW5lcy5ydW5CbG9ja2luZwppbXBvcnQga290bGlueC5jb3JvdXRpbmVzLmZsb3cuZmlyc3QKaW1wb3J0IG9yZy5qdW5pdC5Bc3NlcnQuKgppbXBvcnQgb3JnLmp1bml0LlJ1bGUKaW1wb3J0IG9yZy5qdW5pdC5UZXN0CgpjbGFzcyBEcmFnU29ydFRlc3QgewogICAgQGdldDpSdWxlIHZhbCBjb21wb3NlID0gY3JlYXRlQW5kcm9pZENvbXBvc2VSdWxlPE1haW5BY3Rpdml0eT4oKQogICAgQFRlc3QgZnVuIGRpYWxvZ0FsbG93c1JlcGVhdGVkRHJhZ3NBbmRPbmx5UGVyc2lzdHNPblNhdmUoKSB7CiAgICAgICAgdmFsIGFwcCA9IGNvbXBvc2UuYWN0aXZpdHkuYXBwbGljYXRpb24gYXMgTWVkQXBwbGljYXRpb24KICAgICAgICB2YWwgcmVwbyA9IGFwcC5yZXBvc2l0b3J5CiAgICAgICAgdmFyIGdyb3VwID0gMEw7IHZhciBhID0gMEw7IHZhciBiID0gMEw7IHZhciBjID0gMEwKICAgICAgICBydW5CbG9ja2luZyB7CiAgICAgICAgICAgIGFwcC5kYXRhYmFzZS5jbGVhckFsbFRhYmxlcygpCiAgICAgICAgICAgIHZhbCBjYXJkID0gcmVwby5kYW8uaW5zZXJ0Q2FyZChOb3RlQ2FyZCgpKQogICAgICAgICAgICBncm91cCA9IHJlcG8uc2F2ZUdyb3VwKE5vdGVHcm91cChjYXJkSWQgPSBjYXJkLCBuYW1lID0gIui/nue7reaOkuW6jyIpLCBSZW1pbmRlcigwKSkKICAgICAgICAgICAgYSA9IHJlcG8uc2F2ZUl0ZW0oZ3JvdXAsIG51bGwsIG51bGwsICLnlLIiLCAiIiwgIjHniYciLCBudWxsKQogICAgICAgICAgICBiID0gcmVwby5zYXZlSXRlbShncm91cCwgbnVsbCwgbnVsbCwgIuS5mSIsICIiLCAiMeeJhyIsIG51bGwpCiAgICAgICAgICAgIGMgPSByZXBvLnNhdmVJdGVtKGdyb3VwLCBudWxsLCBudWxsLCAi5LiZIiwgIiIsICIx54mHIiwgbnVsbCkKICAgICAgICB9CiAgICAgICAgY29tcG9zZS53YWl0VW50aWwoMTAwMDApIHsgY29tcG9zZS5vbkFsbE5vZGVzV2l0aFRleHQoIuaOkuW6jyIpLmZldGNoU2VtYW50aWNzTm9kZXMoKS5pc05vdEVtcHR5KCkgfQogICAgICAgIGNvbXBvc2Uub25Ob2RlV2l0aFRleHQoIuaOkuW6jyIpLnBlcmZvcm1DbGljaygpCiAgICAgICAgZnVuIGRyYWcoZnJvbTogU3RyaW5nLCB0bzogU3RyaW5nKSB7CiAgICAgICAgICAgIHZhbCBzdGFydCA9IGNvbXBvc2Uub25BbGxOb2Rlc1dpdGhUZXh0KGZyb20pLm9uTGFzdCgpLmZldGNoU2VtYW50aWNzTm9kZSgpLmJvdW5kc0luUm9vdC5jZW50ZXIKICAgICAgICAgICAgdmFsIGVuZCA9IGNvbXBvc2Uub25BbGxOb2Rlc1dpdGhUZXh0KHRvKS5vbkxhc3QoKS5mZXRjaFNlbWFudGljc05vZGUoKS5ib3VuZHNJblJvb3QuY2VudGVyCiAgICAgICAgICAgIGNvbXBvc2Uub25BbGxOb2Rlc1dpdGhUZXh0KGZyb20pLm9uTGFzdCgpLnBlcmZvcm1Ub3VjaElucHV0IHsKICAgICAgICAgICAgICAgIGRvd24oY2VudGVyKTsgYWR2YW5jZUV2ZW50VGltZSg3MDApCiAgICAgICAgICAgICAgICBtb3ZlVG8oY2VudGVyICsgT2Zmc2V0KDBmLCBlbmQueSAtIHN0YXJ0LnkpLCA3MDApOyB1cCgpCiAgICAgICAgICAgIH0KICAgICAgICAgICAgY29tcG9zZS53YWl0Rm9ySWRsZSgpCiAgICAgICAgICAgIGNvbXBvc2Uub25Ob2RlV2l0aFRleHQoIuiNr+WTgeS4juWIhumalOadoeaOkuW6jyIpLmFzc2VydElzRGlzcGxheWVkKCkKICAgICAgICAgICAgcnVuQmxvY2tpbmcgeyBhc3NlcnRFcXVhbHMobGlzdE9mKGEsIGIsIGMpLCByZXBvLm5vdGVib29rLmZpcnN0KCkuZ3JvdXBFbnRyaWVzKGdyb3VwKS5tYXAgeyBpdC5rZXkgfSkgfQogICAgICAgIH0KICAgICAgICBkcmFnKCLnlLIiLCAi5LiZIikKICAgICAgICBkcmFnKCLkuZkiLCAi55SyIikKICAgICAgICBjb21wb3NlLm9uTm9kZVdpdGhUZXh0KCLkv53lrZgiKS5wZXJmb3JtQ2xpY2soKQogICAgICAgIGNvbXBvc2Uud2FpdFVudGlsKDEwMDAwKSB7IHJ1bkJsb2NraW5nIHsgcmVwby5ub3RlYm9vay5maXJzdCgpLmdyb3VwRW50cmllcyhncm91cCkubWFwIHsgaXQua2V5IH0gPT0gbGlzdE9mKGMsIGEsIGIpIH0gfQogICAgICAgIGNvbXBvc2Uub25Ob2RlV2l0aFRleHQoIuaOkuW6jyIpLnBlcmZvcm1DbGljaygpCiAgICAgICAgY29tcG9zZS5vbk5vZGVXaXRoVGV4dCgi5Y+W5raIIikucGVyZm9ybUNsaWNrKCkKICAgICAgICBydW5CbG9ja2luZyB7IGFzc2VydEVxdWFscyhsaXN0T2YoYywgYSwgYiksIHJlcG8ubm90ZWJvb2suZmlyc3QoKS5ncm91cEVudHJpZXMoZ3JvdXApLm1hcCB7IGl0LmtleSB9KTsgYXBwLmRhdGFiYXNlLmNsZWFyQWxsVGFibGVzKCkgfQogICAgfQogICAgQFRlc3QgZnVuIGRyYWdNZWRpY2luZUFuZERpdmlkZXJBdXRvU2F2ZXNBbmRDbGlja1N0aWxsRWRpdHMoKSB7CiAgICAgICAgdmFsIGFwcCA9IGNvbXBvc2UuYWN0aXZpdHkuYXBwbGljYXRpb24gYXMgTWVkQXBwbGljYXRpb24KICAgICAgICB2YWwgcmVwbyA9IGFwcC5yZXBvc2l0b3J5CiAgICAgICAgdmFyIGdyb3VwID0gMEw7IHZhciBmaXJzdCA9IDBMOyB2YXIgc2Vjb25kID0gMEw7IHZhciBkaXZpZGVyID0gMEwKICAgICAgICBydW5CbG9ja2luZyB7CiAgICAgICAgICAgIGFwcC5kYXRhYmFzZS5jbGVhckFsbFRhYmxlcygpCiAgICAgICAgICAgIHZhbCBjYXJkID0gcmVwby5kYW8uaW5zZXJ0Q2FyZChOb3RlQ2FyZCgpKQogICAgICAgICAgICBncm91cCA9IHJlcG8uc2F2ZUdyb3VwKE5vdGVHcm91cChjYXJkSWQgPSBjYXJkLCBuYW1lID0gIuaLluWKqOa1i+ivlSIpLCBSZW1pbmRlcigwKSkKICAgICAgICAgICAgZmlyc3QgPSByZXBvLnNhdmVJdGVtKGdyb3VwLCBudWxsLCBudWxsLCAi6I2v5ZOB55SyIiwgIjEwbWciLCAiMeeJhyIsIG51bGwpCiAgICAgICAgICAgIGRpdmlkZXIgPSByZXBvLnNhdmVEaXZpZGVyKE5vdGVEaXZpZGVyKGdyb3VwSWQgPSBncm91cCwgdGV4dCA9ICLpl7TpmpQx5bCP5pe2IikpCiAgICAgICAgICAgIHNlY29uZCA9IHJlcG8uc2F2ZUl0ZW0oZ3JvdXAsIG51bGwsIG51bGwsICLoja/lk4HkuZkiLCAiMjBtZyIsICIy54mHIiwgbnVsbCkKICAgICAgICB9CiAgICAgICAgY29tcG9zZS53YWl0VW50aWwoMTAwMDApIHsgY29tcG9zZS5vbkFsbE5vZGVzV2l0aFRleHQoIuiNr+WTgeS5mSIpLmZldGNoU2VtYW50aWNzTm9kZXMoKS5pc05vdEVtcHR5KCkgfQogICAgICAgIGZ1biBkcmFnKGZyb206IFN0cmluZywgdG86IFN0cmluZykgewogICAgICAgICAgICB2YWwgdGFyZ2V0ID0gY29tcG9zZS5vbk5vZGVXaXRoVGV4dCh0bykuZmV0Y2hTZW1hbnRpY3NOb2RlKCkuYm91bmRzSW5Sb290LmNlbnRlcgogICAgICAgICAgICB2YWwgc3RhcnQgPSBjb21wb3NlLm9uTm9kZVdpdGhUZXh0KGZyb20pLmZldGNoU2VtYW50aWNzTm9kZSgpLmJvdW5kc0luUm9vdC5jZW50ZXIKICAgICAgICAgICAgY29tcG9zZS5vbk5vZGVXaXRoVGV4dChmcm9tKS5wZXJmb3JtVG91Y2hJbnB1dCB7CiAgICAgICAgICAgICAgICBkb3duKGNlbnRlcik7IGFkdmFuY2VFdmVudFRpbWUoNzAwKQogICAgICAgICAgICAgICAgbW92ZVRvKGNlbnRlciArIE9mZnNldCgwZiwgdGFyZ2V0LnkgLSBzdGFydC55KSwgNzAwKQogICAgICAgICAgICAgICAgdXAoKQogICAgICAgICAgICB9CiAgICAgICAgICAgIGNvbXBvc2Uud2FpdEZvcklkbGUoKQogICAgICAgIH0KICAgICAgICBkcmFnKCLoja/lk4HnlLIiLCAi6I2v5ZOB5LmZIikKICAgICAgICBjb21wb3NlLndhaXRVbnRpbCgxMDAwMCkgeyBydW5CbG9ja2luZyB7IHJlcG8ubm90ZWJvb2suZmlyc3QoKS5ncm91cEVudHJpZXMoZ3JvdXApLm1hcCB7IGl0LmtleSB9ID09IGxpc3RPZigtZGl2aWRlciwgc2Vjb25kLCBmaXJzdCkgfSB9CiAgICAgICAgZHJhZygi6Ze06ZqUMeWwj+aXtiIsICLoja/lk4HnlLIiKQogICAgICAgIGNvbXBvc2Uud2FpdFVudGlsKDEwMDAwKSB7IHJ1bkJsb2NraW5nIHsgcmVwby5ub3RlYm9vay5maXJzdCgpLmdyb3VwRW50cmllcyhncm91cCkubWFwIHsgaXQua2V5IH0gPT0gbGlzdE9mKHNlY29uZCwgZmlyc3QsIC1kaXZpZGVyKSB9IH0KICAgICAgICBjb21wb3NlLm9uTm9kZVdpdGhUZXh0KCLoja/lk4HnlLIiKS5wZXJmb3JtQ2xpY2soKQogICAgICAgIGNvbXBvc2Uub25Ob2RlV2l0aFRleHQoIue8lui+kemhueebriIpLmFzc2VydElzRGlzcGxheWVkKCkKICAgICAgICBjb21wb3NlLm9uTm9kZVdpdGhUZXh0KCLlj5bmtogiKS5wZXJmb3JtQ2xpY2soKQogICAgICAgIHJ1bkJsb2NraW5nIHsgYXNzZXJ0RXF1YWxzKCIx54mHIiwgcmVwby5kYW8uaXRlbShmaXJzdCkhIS5kb3NlKTsgYXNzZXJ0RXF1YWxzKCIy54mHIiwgcmVwby5kYW8uaXRlbShzZWNvbmQpISEuZG9zZSk7IGFwcC5kYXRhYmFzZS5jbGVhckFsbFRhYmxlcygpIH0KICAgIH0KfQo=
+package com.combustible12.medreminder
+
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import org.junit.Assert.*
+import org.junit.Rule
+import org.junit.Test
+
+class DragSortTest {
+    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @Test fun dialogAllowsRepeatedDragsAndOnlyPersistsOnSave() {
+        val app = compose.activity.application as MedApplication
+        val repo = app.repository
+        var group = 0L; var a = 0L; var b = 0L; var c = 0L
+        runBlocking {
+            app.database.clearAllTables()
+            val card = repo.dao.insertCard(NoteCard())
+            group = repo.saveGroup(NoteGroup(cardId = card, name = "连续排序"), Reminder(0))
+            a = repo.saveItem(group, null, null, "甲", "", "1片", null)
+            b = repo.saveItem(group, null, null, "乙", "", "1片", null)
+            c = repo.saveItem(group, null, null, "丙", "", "1片", null)
+        }
+        compose.waitUntil(10000) { compose.onAllNodesWithText("排序").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("排序").performClick()
+        fun drag(from: String, to: String) {
+            val start = compose.onAllNodesWithText(from).onLast().fetchSemanticsNode().boundsInRoot.center
+            val end = compose.onAllNodesWithText(to).onLast().fetchSemanticsNode().boundsInRoot.center
+            compose.onAllNodesWithText(from).onLast().performTouchInput {
+                down(center); advanceEventTime(700)
+                moveTo(center + Offset(0f, end.y - start.y), 700); up()
+            }
+            compose.waitForIdle()
+            compose.onNodeWithText("药品与分隔条排序").assertIsDisplayed()
+            runBlocking { assertEquals(listOf(a, b, c), repo.notebook.first().groupEntries(group).map { it.key }) }
+        }
+        drag("甲", "丙")
+        drag("乙", "甲")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(10000) { runBlocking { repo.notebook.first().groupEntries(group).map { it.key } == listOf(c, a, b) } }
+        compose.onNodeWithText("排序").performClick()
+        compose.onNodeWithText("取消").performClick()
+        runBlocking { assertEquals(listOf(c, a, b), repo.notebook.first().groupEntries(group).map { it.key }); app.database.clearAllTables() }
+    }
+    @Test fun dragMedicineAndDividerAutoSavesAndClickStillEdits() {
+        val app = compose.activity.application as MedApplication
+        val repo = app.repository
+        var group = 0L; var first = 0L; var second = 0L; var divider = 0L
+        runBlocking {
+            app.database.clearAllTables()
+            val card = repo.dao.insertCard(NoteCard())
+            group = repo.saveGroup(NoteGroup(cardId = card, name = "拖动测试"), Reminder(0))
+            first = repo.saveItem(group, null, null, "药品甲", "10mg", "1片", null)
+            divider = repo.saveDivider(NoteDivider(groupId = group, text = "间隔1小时"))
+            second = repo.saveItem(group, null, null, "药品乙", "20mg", "2片", null)
+        }
+        compose.waitUntil(10000) { compose.onAllNodesWithText("药品乙").fetchSemanticsNodes().isNotEmpty() }
+        fun drag(from: String, to: String) {
+            val target = compose.onNodeWithText(to).fetchSemanticsNode().boundsInRoot.center
+            val start = compose.onNodeWithText(from).fetchSemanticsNode().boundsInRoot.center
+            compose.onNodeWithText(from).performTouchInput {
+                down(center); advanceEventTime(700)
+                moveTo(center + Offset(0f, target.y - start.y), 700)
+                up()
+            }
+            compose.waitForIdle()
+        }
+        drag("药品甲", "药品乙")
+        compose.waitUntil(10000) { runBlocking { repo.notebook.first().groupEntries(group).map { it.key } == listOf(-divider, second, first) } }
+        drag("间隔1小时", "药品甲")
+        compose.waitUntil(10000) { runBlocking { repo.notebook.first().groupEntries(group).map { it.key } == listOf(second, first, -divider) } }
+        compose.onNodeWithText("药品甲").performClick()
+        compose.onNodeWithText("编辑项目").assertIsDisplayed()
+        compose.onNodeWithText("取消").performClick()
+        runBlocking { assertEquals("1片", repo.dao.item(first)!!.dose); assertEquals("2片", repo.dao.item(second)!!.dose); app.database.clearAllTables() }
+    }
+}
