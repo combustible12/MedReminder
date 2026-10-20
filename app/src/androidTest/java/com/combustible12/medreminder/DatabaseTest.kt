@@ -12,7 +12,7 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DatabaseTest {
-    @Test fun reuseIndependentDosesHistoryDeletionAndReopen() = runBlocking {
+    @Test fun reuseIndependentDosesHistoryDeletionAndReopen() = runBlocking<Unit> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val filename = "acceptance-${System.nanoTime()}.db"
         var db = Room.databaseBuilder(context, MedDatabase::class.java, filename).build()

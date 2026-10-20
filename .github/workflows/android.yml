@@ -63,7 +63,9 @@ jobs:
           arch: x86_64
           profile: pixel_2
           disable-animations: true
-          script: gradle :app:connectedDebugAndroidTest --stacktrace
+          script: |
+            gradle :app:connectedDebugAndroidTest --stacktrace
+            adb pull /sdcard/Android/data/com.combustible12.medreminder/files/qa qa-screenshots
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -71,6 +73,7 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
+            qa-screenshots/
   publish:
     if: github.ref == 'refs/heads/main'
     needs: [build, acceptance]
