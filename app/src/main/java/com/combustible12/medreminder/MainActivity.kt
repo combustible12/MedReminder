@@ -204,11 +204,11 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         if (med != null) {
                             Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(vertical = 6.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(.45f)) {
-                                    Text(med.name, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                                    Text(med.name, fontSize = (19f * 2f / 3f).sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                     if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet, modifier = Modifier.padding(top = 1.5.dp))
                                 }
                                 Box(Modifier.weight(.25f), contentAlignment = Alignment.Center) {
-                                    Text(item.dose, fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                    Text(item.dose, fontSize = (25f * 2f / 3f).sp, fontWeight = FontWeight.Bold, color = Ink)
                                 }
                                 Box(Modifier.weight(.30f), contentAlignment = Alignment.CenterEnd) {
                                     med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
