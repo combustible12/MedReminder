@@ -7,7 +7,8 @@
 - Room 1→2 无损迁移，已有单图保留；新增多图保存重开和引用保护清理验证通过。
 - 6 项 JVM 测试通过，Android 16（API 36）8 项设备测试全部通过，含缩放/重置/切图断言。
 - 构建与设备验收：https://github.com/combustible12/MedReminder/actions/runs/39384615745
-- 使用原签名，版本 1.0.2 / versionCode 3。最终覆盖安装检查另由发布工作流执行。
+- 使用原签名，版本 1.0.2 / versionCode 3。最终签名包覆盖旧版安装并启动成功，已发布 v1.0.2-build.20。
+- 最终发布验收：https://github.com/combustible12/MedReminder/actions/runs/39385573782
 - 仅使用一个 Android 16 模拟器环境，未声称荣耀 MagicOS 真机验收。
 
 以下为历史版本记录。
