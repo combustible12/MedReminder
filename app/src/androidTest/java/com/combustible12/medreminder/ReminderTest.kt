@@ -67,8 +67,13 @@ class ReminderTest {
         if (Build.VERSION.SDK_INT < 33) return@runBlocking
         val context = ApplicationProvider.getApplicationContext<Context>()
         val app = context.applicationContext as MedApplication
-        shell("appops set ${context.packageName} POST_NOTIFICATION deny")
-        try { assertNotNull(app.scheduler.permissionProblem()) }
-        finally { shell("appops set ${context.packageName} POST_NOTIFICATION allow") }
+        // A denied permission input exercises the real ContextCompat check without revoking
+        // a permission on the instrumentation UID (Android kills that UID on revocation).
+        val deniedContext = object : android.content.ContextWrapper(context) {
+            override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
+                if (permission == Manifest.permission.POST_NOTIFICATIONS) android.content.pm.PackageManager.PERMISSION_DENIED
+                else super.checkPermission(permission, pid, uid)
+        }
+        assertEquals("尚未允许通知，提醒无法显示", ReminderScheduler(deniedContext, app.database).permissionProblem())
     }
 }

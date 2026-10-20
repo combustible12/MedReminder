@@ -6,3 +6,5 @@ local.properties
 .idea/
 
 release/MedReminder-*.apk
+
+.kotlin/

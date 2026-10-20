@@ -13,6 +13,10 @@ import org.junit.Test
 
 class UiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    private fun logScreenshot(file: java.io.File) {
+        val chunks = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP).chunked(3000)
+        chunks.forEachIndexed { index, chunk -> android.util.Log.i("MedReminderQA", "${file.name}:$index/${chunks.size}:$chunk") }
+    }
     @Before fun reset() = runBlocking { withContext(Dispatchers.IO) { (compose.activity.application as MedApplication).database.clearAllTables() } }
     @After fun cleanup() = reset()
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
@@ -35,6 +39,7 @@ class UiTest {
         val file = java.io.File(compose.activity.getExternalFilesDir("qa"), "home-optional-fields.png")
         file.parentFile!!.mkdirs()
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+        logScreenshot(file)
         compose.onNodeWithText("1次").assertIsDisplayed()
         compose.onNodeWithText("20mg").assertDoesNotExist()
         compose.onNodeWithText("药品库").performClick()
@@ -60,6 +65,7 @@ class UiTest {
         val file = java.io.File(compose.activity.getExternalFilesDir("qa"), "home-cards.png")
         file.parentFile!!.mkdirs()
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
+        logScreenshot(file)
         compose.onNodeWithContentDescription("查看示例药品 1图片").performClick()
         compose.onNodeWithContentDescription("药品大图").assertIsDisplayed()
         compose.onNodeWithContentDescription("关闭大图").performClick()
