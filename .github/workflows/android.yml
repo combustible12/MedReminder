@@ -41,10 +41,16 @@ jobs:
         with:
           name: MedReminder-debug-installable
           path: app/build/outputs/apk/debug/*.apk
+      - name: Export APK signing tool
+        run: |
+          mkdir -p signing-tools
+          cp "$(find "$ANDROID_HOME/build-tools" -name apksigner.jar | sort | tail -1)" signing-tools/apksigner.jar
       - uses: actions/upload-artifact@v4
         with:
           name: unsigned-release-apk
-          path: app/build/outputs/apk/release/*.apk
+          path: |
+            app/build/outputs/apk/release/*.apk
+            signing-tools/**
   acceptance:
     if: ${{ !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') }}
     needs: build

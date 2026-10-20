@@ -14,6 +14,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -122,7 +128,7 @@ fun NotebookApp(app: MedApplication) {
                             confirm = Confirmation("删除卡片？", "删除卡片内的大类和首页安排，并取消提醒。药品库和使用历史会保留。") {
                                 ReminderScheduler.mutex.withLock { state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.dao.deleteCard(card.id) }
                             }
-                        }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it })
+                        }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it }, { group, keys -> perform { repo.reorderEntries(group.id, keys) } })
                     }
                 }
             } else { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
@@ -161,7 +167,7 @@ fun NotebookApp(app: MedApplication) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?, addDivider: (NoteGroup) -> Unit, editDivider: (NoteDivider) -> Unit) {
+private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?, addDivider: (NoteGroup) -> Unit, editDivider: (NoteDivider) -> Unit, saveOrder: (NoteGroup, List<Long>) -> Unit) {
     val groups = state.groups.filter { it.cardId == card.id }
     val color = Colors[card.color.mod(Colors.size)]
     val accent = Accents[card.color.mod(Colors.size)]
@@ -203,7 +209,8 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                 }
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(21.dp)).background(androidx.compose.ui.graphics.lerp(color, Color.White, .85f)).padding(horizontal = 14.dp)) {
                     val groupItems = state.groupEntries(group.id)
-                    groupItems.forEachIndexed { index, entry ->
+                    DragEntryList(groupItems.map { it.key }, { saveOrder(group, it) }) { index, entryKey ->
+                        val entry = groupItems.first { it.key == entryKey }
                         val divider = entry.divider
                         if (divider != null) {
                             Row(Modifier.fillMaxWidth().clickable { editDivider(divider) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -407,14 +414,14 @@ private fun PeriodDialog(period: UsePeriod, dismiss: () -> Unit, save: (UsePerio
 
 @Composable
 private fun OrderDialog(order: OrderEditor, dismiss: () -> Unit, save: (List<Long>) -> Unit) {
-    var rows by remember { mutableStateOf(order.rows) }
-    EditorDialog(order.title, dismiss, { save(rows.map { it.first }) }) {
-        if (rows.isEmpty()) Text("暂无可排列内容", color = Quiet)
-        rows.forEachIndexed { index, row -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(row.second, Modifier.weight(1f))
-            IconButton(onClick = { rows = rows.toMutableList().apply { add(index - 1, removeAt(index)) } }, enabled = index > 0) { Icon(Icons.Outlined.KeyboardArrowUp, "上移${row.second}") }
-            IconButton(onClick = { rows = rows.toMutableList().apply { add(index + 1, removeAt(index)) } }, enabled = index < rows.lastIndex) { Icon(Icons.Outlined.KeyboardArrowDown, "下移${row.second}") }
-        } }
+    EditorDialog(order.title, dismiss, dismiss) {
+        Text("长按条目上下拖动，松手保存", color = Quiet, fontSize = 12.sp)
+        DragEntryList(order.rows.map { it.first }, save) { _, id ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(order.rows.first { it.first == id }.second, Modifier.weight(1f))
+                Icon(Icons.Outlined.DragHandle, "长按拖动", tint = Quiet)
+            }
+        }
     }
 }
 
@@ -428,5 +435,57 @@ private fun DividerDialog(divider: NoteDivider, dismiss: () -> Unit, save: (Stri
         SoftTextField(text, { text = it; error = false }, label = { Text("分隔文字") }, modifier = Modifier.fillMaxWidth(), isError = error)
         if (error) Text("请填写分隔文字", color = MaterialTheme.colorScheme.error)
         if (divider.id != 0L) TextButton(onClick = delete) { Text("删除分隔条", color = Color(0xFFB56F71)) }
+    }
+}
+
+
+/** Stable parent coordinates keep the finger attached while keyed children move. */
+@Composable
+private fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, content: @Composable (Int, Long) -> Unit) {
+    var ordered by remember { mutableStateOf(source) }
+    var dragging by remember { mutableStateOf<Long?>(null) }
+    var fingerY by remember { mutableFloatStateOf(0f) }
+    var grabOffset by remember { mutableFloatStateOf(0f) }
+    val bounds = remember { mutableStateMapOf<Long, Pair<Float, Float>>() }
+    val latestSave by rememberUpdatedState(save)
+    val latestSource by rememberUpdatedState(source)
+    LaunchedEffect(source) { if (dragging == null) ordered = source }
+    Column(Modifier.fillMaxWidth().pointerInput(Unit) {
+        detectDragGesturesAfterLongPress(
+            onDragStart = { point ->
+                val id = ordered.firstOrNull { id -> bounds[id]?.let { point.y >= it.first && point.y < it.second } == true }
+                dragging = id
+                fingerY = point.y
+                grabOffset = point.y - (bounds[id]?.first ?: point.y)
+            },
+            onDrag = { change, amount ->
+                val id = dragging
+                if (id != null) {
+                    change.consume()
+                    fingerY += amount.y
+                    val target = ordered.firstOrNull { other -> other != id && bounds[other]?.let { fingerY >= it.first && fingerY < it.second } == true }
+                    if (target != null) {
+                        ordered = ordered.toMutableList().apply { val from = indexOf(id); val to = indexOf(target); add(to, removeAt(from)) }
+                    }
+                }
+            },
+            onDragEnd = {
+                if (dragging != null && ordered != latestSource) latestSave(ordered)
+                dragging = null
+            },
+            onDragCancel = { dragging = null; ordered = latestSource }
+        )
+    }) {
+        ordered.forEachIndexed { index, id ->
+            key(id) {
+                Box(Modifier.fillMaxWidth().onGloballyPositioned { c ->
+                    val top = c.positionInParent().y
+                    bounds[id] = top to top + c.size.height
+                }.zIndex(if (dragging == id) 1f else 0f).graphicsLayer {
+                    translationY = if (dragging == id) fingerY - grabOffset - (bounds[id]?.first ?: 0f) else 0f
+                    alpha = if (dragging == id) .8f else 1f
+                }) { content(index, id) }
+            }
+        }
     }
 }
