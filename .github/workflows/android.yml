@@ -125,7 +125,7 @@ jobs:
             adb install /tmp/MedReminder-old.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
-            adb install -r release/MedReminder-1.0.9.apk
+            adb install -r release/MedReminder-1.0.10.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
             adb shell pidof com.combustible12.medreminder
@@ -134,11 +134,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.9-build.${{ github.run_number }}"
+          TAG="v1.0.10-build.${{ github.run_number }}"
           python3 - "$TAG" <<'PYTHON'
           import hashlib, json, sys
           from pathlib import Path
-          apk = Path("release/MedReminder-1.0.9.apk")
-          Path("release/update.json").write_text(json.dumps({"name": "MedReminder 1.0.9", "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "url": "https://github.com/combustible12/MedReminder/releases/download/" + sys.argv[1] + "/" + apk.name}))
+          apk = Path("release/MedReminder-1.0.10.apk")
+          Path("release/update.json").write_text(json.dumps({"name": "MedReminder 1.0.10", "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "url": "https://github.com/combustible12/MedReminder/releases/download/" + sys.argv[1] + "/" + apk.name}))
           PYTHON
-          gh release create "$TAG" release/MedReminder-1.0.9.apk release/update.json --title "MedReminder 1.0.9" --notes-file docs/RELEASE_NOTES.md --latest --target "${{ github.sha }}"
+          gh release create "$TAG" release/MedReminder-1.0.10.apk release/update.json --title "MedReminder 1.0.10" --notes-file docs/RELEASE_NOTES.md --latest --target "${{ github.sha }}"
