@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import java.io.File
 
 private val Ink = Color(0xFF151B2D)
@@ -81,8 +82,9 @@ fun NotebookApp(app: MedApplication) {
     var permissionProblem by remember { mutableStateOf(app.scheduler.permissionProblem()) }
     var permissionEpoch by remember { mutableIntStateOf(0) }
     val owner = LocalLifecycleOwner.current
-    fun perform(action: suspend () -> Unit) { scope.launch { try { action() } catch (e: Exception) { snack.showSnackbar(e.message ?: "保存失败，请重试") } } }
-    fun refreshPermissions() { permissionEpoch++; permissionProblem = app.scheduler.permissionProblem(); perform { app.scheduler.scheduleAll() } }
+    var busy by remember { mutableStateOf(false) }
+    fun perform(action: suspend () -> Unit) { if (busy) return; busy = true; scope.launch { try { action() } catch (e: Exception) { snack.showSnackbar(e.message ?: "保存失败，请重试") } finally { busy = false } } }
+    fun refreshPermissions() { permissionEpoch++; permissionProblem = app.scheduler.permissionProblem(); scope.launch { app.scheduler.scheduleAll() } }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refreshPermissions() }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) refreshPermissions() }
@@ -109,7 +111,7 @@ fun NotebookApp(app: MedApplication) {
             val detail = state.medicines.firstOrNull { it.id == detailId }
             if (detailId != null && detail != null) {
                 MedicineDetail(detail, state.periods.filter { it.medicineId == detail.id }, { fullImage = it }, { medicineEditor = detail }, { periodEditor = it }, {
-                    confirm = Confirmation("删除药品档案？", "将删除此药品的全部使用历史和关联首页条目，无法恢复。") { val image = detail.image; repo.dao.deleteMedicine(detail.id); ImageStore(app).removeIfUnused(image, app.database); app.scheduler.scheduleAll(); detailId = null }
+                    confirm = Confirmation("删除药品档案？", "将删除此药品的全部使用历史和关联首页条目，无法恢复。") { val image = detail.image; ReminderScheduler.mutex.withLock { repo.dao.deleteMedicine(detail.id) }; ImageStore(app).removeIfUnused(image, app.database); app.scheduler.scheduleAll(); detailId = null }
                 })
             } else if (tab == 0) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -117,7 +119,7 @@ fun NotebookApp(app: MedApplication) {
                     items(state.cards, key = { it.id }) { card ->
                         NoteCardView(card, state, { cardEditor = card }, { groupEditor = GroupEditor(card.id) }, { groupEditor = GroupEditor(card.id, it) }, { itemEditor = ItemEditor(it.id) }, { itemEditor = ItemEditor(it.groupId, it) }, { fullImage = it }, {
                             confirm = Confirmation("删除卡片？", "删除卡片内的大类和首页安排，并取消提醒。药品库和使用历史会保留。") {
-                                state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.dao.deleteCard(card.id)
+                                ReminderScheduler.mutex.withLock { state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.dao.deleteCard(card.id) }
                             }
                         }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("排列条目", state.items.filter { it.groupId == group.id }.map { it.id to (state.medicines.firstOrNull { med -> med.id == it.medicineId }?.name ?: "") }, repo::reorderItems) }, permissionProblem)
                     }
@@ -128,7 +130,7 @@ fun NotebookApp(app: MedApplication) {
     cardEditor?.let { card -> CardDialog(card, { cardEditor = null }) { updated -> perform { repo.saveCard(updated); cardEditor = null } } }
     groupEditor?.let { editor -> GroupDialog(editor, state.reminders.firstOrNull { it.groupId == editor.group?.id }, { groupEditor = null }, { updated, reminder -> perform { val id = repo.saveGroup(updated, reminder); app.scheduler.schedule(id)?.let { snack.showSnackbar(it) }; groupEditor = null } }, {
         val g = editor.group ?: return@GroupDialog
-        confirm = Confirmation("删除大类？", "取消此大类提醒并删除首页安排，药品库和历史记录会保留。") { app.scheduler.cancel(g.id); repo.dao.deleteGroup(g.id); groupEditor = null }
+        confirm = Confirmation("删除大类？", "取消此大类提醒并删除首页安排，药品库和历史记录会保留。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.dao.deleteGroup(g.id) }; groupEditor = null }
     }) }
     itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, image -> perform { repo.saveItem(editor.groupId, editor.item?.id, selected, name, spec, dose, image); app.scheduler.schedule(editor.groupId); itemEditor = null } }, { med -> medicineEditor = med }, {
         val i = editor.item ?: return@ItemDialog
@@ -151,11 +153,12 @@ fun NotebookApp(app: MedApplication) {
 
 @Composable
 private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?) {
+    val groups = state.groups.filter { it.cardId == card.id }
     val color = Colors[card.color.mod(Colors.size)]
     val accent = Accents[card.color.mod(Colors.size)]
     var menu by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brush.linearGradient(listOf(color, color.copy(alpha = .65f)))).padding(12.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (card.name.isNotBlank() || groups.isEmpty()) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (card.name.isNotBlank()) Text(card.name, Modifier.weight(1f).padding(start = 6.dp), color = accent, fontSize = 14.sp) else Spacer(Modifier.weight(1f))
             Box {
                 IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) { Icon(Icons.Outlined.MoreHoriz, "卡片操作", tint = Quiet) }
@@ -167,7 +170,6 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                 }
             }
         }
-        val groups = state.groups.filter { it.cardId == card.id }
         groups.forEach { group ->
             val r = state.reminders.firstOrNull { it.groupId == group.id }
             Row(Modifier.fillMaxWidth().padding(start = 7.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -180,6 +182,12 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                     DropdownMenu(gm, { gm = false }) {
                         DropdownMenuItem(text = { Text("编辑与提醒") }, onClick = { gm = false; editGroup(group) })
                         DropdownMenuItem(text = { Text("排列条目") }, onClick = { gm = false; reorderItems(group) })
+                        if (group.id == groups.firstOrNull()?.id && card.name.isBlank()) {
+                            DropdownMenuItem(text = { Text("卡片名称与配色") }, onClick = { gm = false; edit() })
+                            DropdownMenuItem(text = { Text("添加大类") }, onClick = { gm = false; addGroup() })
+                            DropdownMenuItem(text = { Text("排列大类") }, onClick = { gm = false; reorder() })
+                            DropdownMenuItem(text = { Text("删除卡片") }, onClick = { gm = false; delete() })
+                        }
                     }
                 }
             }
@@ -316,7 +324,7 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
             OutlinedTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, placeholder = { Text("如 20mg") }, modifier = Modifier.fillMaxWidth())
         }
         OutlinedTextField(dose, { dose = it }, label = { Text("每次用量") }, placeholder = { Text("如 1片、2粒、1次") }, modifier = Modifier.fillMaxWidth())
-        val path = selected?.image ?: image
+        val path = if (selected != null) selected.image else image
         path?.let { AsyncImage(File(it), "药品图片预览", Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop) }
         if (selected == null) Row { TextButton(onClick = { launcher.launch("image/*") }, enabled = !loading) { Text(if (loading) "正在保存图片…" else if (image == null) "选择图片（可不填）" else "更换图片") }; if (image != null) TextButton(onClick = { image = null }) { Text("移除图片") } }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
