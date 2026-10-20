@@ -67,9 +67,13 @@ class UiTest {
         compose.onAllNodesWithText("＋ 添加大类").onFirst().performClick()
         compose.onNodeWithText("大类名称").performTextInput("分批")
         compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("添加大类").fetchSemanticsNodes().isEmpty() }
         compose.waitUntil(5000) { compose.onAllNodesWithText("＋ 分隔条").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("＋ 分隔条").performClick()
+        compose.onNodeWithText("添加分隔条").assertIsDisplayed()
+        compose.onNodeWithText("分隔文字").assertIsDisplayed()
         compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("添加分隔条").fetchSemanticsNodes().isEmpty() }
         compose.waitUntil(5000) { compose.onAllNodesWithText("1小时").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("1小时").performClick()
         compose.onNodeWithText("分隔文字").performTextClearance()
