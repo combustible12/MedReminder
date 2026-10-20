@@ -27,7 +27,7 @@ class PhotosTest {
             old.execSQL("INSERT INTO medicines (id,name,specification,image,defaultDose,identity) VALUES (1,'旧药品','20mg','/old-cover','2片','old')")
             old.version = 1
         }
-        var db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
+        var db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         try {
             var med = db.dao().medicine(1)!!
             assertEquals(listOf("/old-cover"), med.photos())
@@ -35,7 +35,7 @@ class PhotosTest {
             val photos = listOf("/old-cover", "/second", "/third")
             Repository(db).updateMedicine(med.copy(imagesJson = encodePhotos(photos)))
             db.close()
-            db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
+            db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
             med = db.dao().medicine(1)!!
             assertEquals(photos, med.photos())
             Repository(db).updateMedicine(med.copy(image = "/second", imagesJson = encodePhotos(photos.drop(1))))

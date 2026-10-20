@@ -71,6 +71,7 @@ fun NotebookApp(app: MedApplication) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var cardEditor by remember { mutableStateOf<NoteCard?>(null) }
     var groupEditor by remember { mutableStateOf<GroupEditor?>(null) }
+    var dividerEditor by remember { mutableStateOf<NoteDivider?>(null) }
     var itemEditor by remember { mutableStateOf<ItemEditor?>(null) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
     var medicineEditor by remember { mutableStateOf<Medicine?>(null) }
@@ -121,7 +122,7 @@ fun NotebookApp(app: MedApplication) {
                             confirm = Confirmation("删除卡片？", "删除卡片内的大类和首页安排，并取消提醒。药品库和使用历史会保留。") {
                                 ReminderScheduler.mutex.withLock { state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.dao.deleteCard(card.id) }
                             }
-                        }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("排列条目", state.items.filter { it.groupId == group.id }.map { it.id to (state.medicines.firstOrNull { med -> med.id == it.medicineId }?.name ?: "") }, repo::reorderItems) }, permissionProblem)
+                        }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it })
                     }
                 }
             } else { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
@@ -131,6 +132,9 @@ fun NotebookApp(app: MedApplication) {
     groupEditor?.let { editor -> GroupDialog(editor, state.reminders.firstOrNull { it.groupId == editor.group?.id }, { groupEditor = null }, { updated, reminder -> perform { val id = repo.saveGroup(updated, reminder); app.scheduler.schedule(id)?.let { snack.showSnackbar(it) }; groupEditor = null } }, {
         val g = editor.group ?: return@GroupDialog
         confirm = Confirmation("删除大类？", "取消此大类提醒并删除首页安排，药品库和历史记录会保留。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.dao.deleteGroup(g.id) }; groupEditor = null }
+    }) }
+    dividerEditor?.let { divider -> DividerDialog(divider, { dividerEditor = null }, { text -> perform { repo.saveDivider(divider.copy(text = text)); dividerEditor = null } }, {
+        confirm = Confirmation("删除分隔条？", "只删除这条分隔线，药品安排保留。") { repo.dao.deleteDivider(divider.id); dividerEditor = null }
     }) }
     itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, images -> perform { repo.saveItem(editor.groupId, editor.item?.id, selected, name, spec, dose, images.firstOrNull(), encodePhotos(images)); app.scheduler.schedule(editor.groupId); itemEditor = null } }, { med -> medicineEditor = med }, {
         val i = editor.item ?: return@ItemDialog
@@ -157,7 +161,7 @@ fun NotebookApp(app: MedApplication) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?) {
+private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?, addDivider: (NoteGroup) -> Unit, editDivider: (NoteDivider) -> Unit) {
     val groups = state.groups.filter { it.cardId == card.id }
     val color = Colors[card.color.mod(Colors.size)]
     val accent = Accents[card.color.mod(Colors.size)]
@@ -187,7 +191,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         IconButton(onClick = { gm = true }, modifier = Modifier.size(width = 32.dp, height = 24.dp)) { Icon(Icons.Outlined.MoreHoriz, "大类操作", tint = Quiet, modifier = Modifier.size(19.dp)) }
                         DropdownMenu(gm, { gm = false }) {
                             DropdownMenuItem(text = { Text("编辑与提醒") }, onClick = { gm = false; editGroup(group) })
-                            DropdownMenuItem(text = { Text("排列条目") }, onClick = { gm = false; reorderItems(group) })
+                            DropdownMenuItem(text = { Text("药品排序") }, onClick = { gm = false; reorderItems(group) })
                             if (group.id == groups.firstOrNull()?.id && card.name.isBlank()) {
                                 DropdownMenuItem(text = { Text("卡片名称与配色") }, onClick = { gm = false; edit() })
                                 DropdownMenuItem(text = { Text("添加大类") }, onClick = { gm = false; addGroup() })
@@ -198,8 +202,17 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                     }
                 }
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(21.dp)).background(androidx.compose.ui.graphics.lerp(color, Color.White, .85f)).padding(horizontal = 14.dp)) {
-                    val groupItems = state.items.filter { it.groupId == group.id }
-                    groupItems.forEachIndexed { index, item ->
+                    val groupItems = state.groupEntries(group.id)
+                    groupItems.forEachIndexed { index, entry ->
+                        val divider = entry.divider
+                        if (divider != null) {
+                            Row(Modifier.fillMaxWidth().clickable { editDivider(divider) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = .4f))
+                                Text(divider.text, color = accent, fontSize = 12.sp, modifier = Modifier.widthIn(max = 180.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = .4f))
+                            }
+                        } else {
+                        val item = requireNotNull(entry.item)
                         val med = state.medicines.firstOrNull { it.id == item.medicineId }
                         if (med != null) {
                             Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -217,7 +230,12 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                             Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else 0.5.dp))
                         }
                     }
-                    TextButton(onClick = { addItem(group) }, modifier = Modifier.heightIn(min = 24.dp), contentPadding = PaddingValues(vertical = 4.5.dp, horizontal = 0.dp)) { Text("＋ 添加项目", color = accent.copy(alpha = .72f), fontSize = 13.sp) }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { addItem(group) }, modifier = Modifier.heightIn(min = 24.dp), contentPadding = PaddingValues(vertical = 4.5.dp, horizontal = 0.dp)) { Text("＋ 添加项目", color = accent.copy(alpha = .72f), fontSize = 13.sp) }
+                        TextButton(onClick = { addDivider(group) }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.5.dp)) { Text("＋ 分隔条", color = accent.copy(alpha = .72f), fontSize = 12.sp) }
+                        TextButton(onClick = { reorderItems(group) }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.5.dp)) { Text("排序", color = accent.copy(alpha = .72f), fontSize = 12.sp) }
+                    }
                 }
                 Spacer(Modifier.height(3.5.dp))
             }
@@ -402,5 +420,18 @@ private fun OrderDialog(order: OrderEditor, dismiss: () -> Unit, save: (List<Lon
             IconButton(onClick = { rows = rows.toMutableList().apply { add(index - 1, removeAt(index)) } }, enabled = index > 0) { Icon(Icons.Outlined.KeyboardArrowUp, "上移${row.second}") }
             IconButton(onClick = { rows = rows.toMutableList().apply { add(index + 1, removeAt(index)) } }, enabled = index < rows.lastIndex) { Icon(Icons.Outlined.KeyboardArrowDown, "下移${row.second}") }
         } }
+    }
+}
+
+@Composable
+private fun DividerDialog(divider: NoteDivider, dismiss: () -> Unit, save: (String) -> Unit, delete: () -> Unit) {
+    var text by remember(divider.id) { mutableStateOf(divider.text) }
+    var error by remember { mutableStateOf(false) }
+    EditorDialog(if (divider.id == 0L) "添加分隔条" else "编辑分隔条", dismiss, {
+        if (text.isBlank()) error = true else save(text.trim())
+    }) {
+        SoftTextField(text, { text = it; error = false }, label = { Text("分隔文字") }, modifier = Modifier.fillMaxWidth(), isError = error)
+        if (error) Text("请填写分隔文字", color = MaterialTheme.colorScheme.error)
+        if (divider.id != 0L) TextButton(onClick = delete) { Text("删除分隔条", color = Color(0xFFB56F71)) }
     }
 }

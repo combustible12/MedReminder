@@ -22,7 +22,7 @@ class UiTest {
     @Before fun reset() = runBlocking { withContext(Dispatchers.IO) { (compose.activity.application as MedApplication).database.clearAllTables() } }
     @After fun cleanup() = reset()
     @Test fun updateEntryAndInstalledPackageGuard() {
-        compose.onNodeWithText("一键更新并升级").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithText("更新").assertIsDisplayed().assertHasClickAction()
         val current = java.io.File(compose.activity.applicationInfo.sourceDir)
         org.junit.Assert.assertFalse("Same version must not install again", AppUpdater(compose.activity).validate(current))
         val invalid = java.io.File(compose.activity.cacheDir, "invalid.apk").apply { writeText("not an apk") }
@@ -59,6 +59,27 @@ class UiTest {
         compose.onNodeWithText("测试护理").assertIsDisplayed()
         compose.onNodeWithText("搜索药品名称").performTextInput("不存在的药品")
         compose.onNodeWithText("暂无药品记录").assertIsDisplayed()
+    }
+    @Test fun addEditAndReorderDivider() {
+        compose.onNodeWithContentDescription("添加卡片").performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("＋ 添加大类").fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodesWithText("＋ 添加大类").onFirst().performClick()
+        compose.onNodeWithText("大类名称").performTextInput("分批")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("＋ 分隔条").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("＋ 分隔条").performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("1小时").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("1小时").performClick()
+        compose.onNodeWithText("分隔文字").performTextClearance()
+        compose.onNodeWithText("分隔文字").performTextInput("间隔1小时")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("间隔1小时").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("排序").performClick()
+        compose.onNodeWithText("分隔条：间隔1小时").assertIsDisplayed()
+        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("间隔1小时").assertIsDisplayed()
     }
     @Test fun referenceLayoutAndImageViewer() {
         val app = compose.activity.application as MedApplication
