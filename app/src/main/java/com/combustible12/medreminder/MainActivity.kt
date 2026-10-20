@@ -199,10 +199,11 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                     }
                 }
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(21.dp)).background(androidx.compose.ui.graphics.lerp(color, Color.White, .85f)).padding(horizontal = 14.dp)) {
-                    state.items.filter { it.groupId == group.id }.forEach { item ->
+                    val groupItems = state.items.filter { it.groupId == group.id }
+                    groupItems.forEachIndexed { index, item ->
                         val med = state.medicines.firstOrNull { it.id == item.medicineId }
                         if (med != null) {
-                            Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(vertical = 6.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(.45f)) {
                                     Text(med.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                     if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet, modifier = Modifier.padding(top = 1.5.dp))
@@ -214,7 +215,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                     med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
                                 }
                             }
-                            Spacer(Modifier.height(1.dp))
+                            Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else 0.5.dp))
                         }
                     }
                     TextButton(onClick = { addItem(group) }, modifier = Modifier.heightIn(min = 24.dp), contentPadding = PaddingValues(vertical = 4.5.dp, horizontal = 0.dp)) { Text("＋ 添加项目", color = accent.copy(alpha = .72f), fontSize = 13.sp) }
