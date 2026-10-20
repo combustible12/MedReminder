@@ -8,7 +8,7 @@ for filename, expected in metadata['sources'].items():
     if actual != expected:
         raise SystemExit(f'Source changed after APK signing: {filename}')
 parts = sorted((root / 'release').glob('apk.part*'))
-apk = root / 'release/MedReminder-1.0.0.apk'
+apk = root / ('release/MedReminder-' + metadata['version'] + '.apk')
 if parts:
     with apk.open('wb') as output:
         for part in parts:

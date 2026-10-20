@@ -117,7 +117,11 @@ jobs:
           profile: pixel_2
           disable-animations: true
           script: |
-            adb install release/MedReminder-1.0.0.apk
+            curl -fL --retry 3 https://github.com/combustible12/MedReminder/releases/download/v1.0.0-build.13/MedReminder-1.0.0.apk -o /tmp/MedReminder-old.apk
+            adb install /tmp/MedReminder-old.apk
+            adb shell am start -W -n com.combustible12.medreminder/.MainActivity
+            adb shell sleep 3
+            adb install -r release/MedReminder-1.0.1.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
             adb shell pidof com.combustible12.medreminder
@@ -126,5 +130,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.0-build.${{ github.run_number }}"
-          gh release create "$TAG" release/MedReminder-1.0.0.apk --title "MedReminder 1.0.0" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
+          TAG="v1.0.1-build.${{ github.run_number }}"
+          gh release create "$TAG" release/MedReminder-1.0.1.apk --title "MedReminder 1.0.1" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
