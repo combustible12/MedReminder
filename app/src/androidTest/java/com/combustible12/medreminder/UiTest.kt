@@ -20,6 +20,14 @@ class UiTest {
     }
     @Before fun reset() = runBlocking { withContext(Dispatchers.IO) { (compose.activity.application as MedApplication).database.clearAllTables() } }
     @After fun cleanup() = reset()
+    @Test fun updateEntryAndInstalledPackageGuard() {
+        compose.onNodeWithText("一键更新并升级").performScrollTo().assertIsDisplayed().assertHasClickAction()
+        val current = java.io.File(compose.activity.applicationInfo.sourceDir)
+        org.junit.Assert.assertFalse("Same version must not install again", AppUpdater(compose.activity).validate(current))
+        val invalid = java.io.File(compose.activity.cacheDir, "invalid.apk").apply { writeText("not an apk") }
+        org.junit.Assert.assertTrue(runCatching { AppUpdater(compose.activity).validate(invalid) }.isFailure)
+        invalid.delete()
+    }
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
         compose.onNodeWithContentDescription("添加卡片").performClick()
         compose.onNodeWithText("保存").performClick()

@@ -123,6 +123,7 @@ fun NotebookApp(app: MedApplication) {
                             }
                         }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("排列条目", state.items.filter { it.groupId == group.id }.map { it.id to (state.medicines.firstOrNull { med -> med.id == it.medicineId }?.name ?: "") }, repo::reorderItems) }, permissionProblem)
                     }
+                    item { AppUpdateButton() }
                 }
             } else { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
         }
