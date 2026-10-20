@@ -118,13 +118,16 @@ class Repository(val db: MedDatabase) {
         dao.putReminder(reminder.copy(groupId = id, enabled = reminder.enabled && reminder.hour != null && reminder.minute != null))
         id
     }
-    suspend fun saveItem(groupId: Long, itemId: Long?, selectedId: Long?, name: String, spec: String, dose: String, image: String?, imagesJson: String = ""): Long = db.withTransaction {
+    suspend fun saveItem(groupId: Long, itemId: Long?, selectedId: Long?, name: String, spec: String, dose: String, image: String?, imagesJson: String = "", editSelected: Boolean = false): Long = db.withTransaction {
         require(name.isNotBlank()) { "请填写名称" }
         val old = itemId?.let { dao.item(it) }
         if (itemId != null) requireNotNull(old) { "条目已被删除" }
         requireNotNull(dao.group(groupId)) { "大类已被删除" }
         val selected = selectedId?.let { dao.medicine(it) }
         if (selectedId != null) requireNotNull(selected) { "药品已被删除" }
+        if (editSelected && selected != null) {
+            updateMedicine(selected.copy(name = name, specification = spec, image = image, imagesJson = imagesJson))
+        }
         // Editing an arrangement may select a different identity; it must not rename every other arrangement.
         val med = selected ?: dao.findMedicine(identityOf(name, spec))
         if (selected == null && med != null && image != null) {

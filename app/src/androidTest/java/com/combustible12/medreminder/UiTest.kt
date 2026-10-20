@@ -60,6 +60,41 @@ class UiTest {
         compose.onNodeWithText("搜索药品名称").performTextInput("不存在的药品")
         compose.onNodeWithText("暂无药品记录").assertIsDisplayed()
     }
+    @Test fun editMedicineFieldsAndPhotosDirectlyInItemDialog() {
+        val repo = (compose.activity.application as MedApplication).repository
+        runBlocking {
+            val card = repo.dao.insertCard(NoteCard())
+            val group = repo.saveGroup(NoteGroup(cardId = card, name = "餐后"), Reminder(0))
+            repo.saveItem(group, null, null, "原药品", "10mg", "1片", "/test-photo")
+        }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("原药品").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("原药品").performClick()
+        compose.onNodeWithText("药品或护理名称").assertIsDisplayed().performTextClearance()
+        compose.onNodeWithText("药品或护理名称").performTextInput("取消草稿")
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("原药品").assertIsDisplayed().performClick()
+        compose.onNodeWithText("编辑药品名称、规格或图片").assertDoesNotExist()
+        compose.onNodeWithText("药品或护理名称").performTextClearance()
+        compose.onNodeWithText("药品或护理名称").performTextInput("新药品")
+        compose.onNodeWithText("规格（可不填）").performTextClearance()
+        compose.onNodeWithText("规格（可不填）").performTextInput("20mg")
+        compose.onNodeWithText("每次用量").performTextClearance()
+        compose.onNodeWithText("每次用量").performTextInput("3片")
+        compose.onNodeWithText("删除第1张").performScrollTo().performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithText("编辑项目").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText("新药品").assertIsDisplayed()
+        compose.onNodeWithText("20mg").assertIsDisplayed()
+        compose.onNodeWithText("3片").assertIsDisplayed()
+        compose.onNodeWithText("新药品").performClick()
+        compose.onNodeWithText("药品或护理名称").assertIsDisplayed()
+        compose.onNodeWithText("继续添加图片").assertDoesNotExist()
+        compose.onNodeWithText("取消").performClick()
+        runBlocking {
+            org.junit.Assert.assertEquals("新药品", repo.dao.medicines().first().single().name)
+            org.junit.Assert.assertTrue(repo.dao.medicines().first().single().photos().isEmpty())
+        }
+    }
     @Test fun addEditAndReorderDivider() {
         compose.onNodeWithContentDescription("添加卡片").performClick()
         compose.onNodeWithText("保存").performClick()
