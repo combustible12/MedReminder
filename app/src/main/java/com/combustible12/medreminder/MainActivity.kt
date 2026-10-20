@@ -15,6 +15,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -111,7 +118,7 @@ fun NotebookApp(app: MedApplication) {
             val detail = state.medicines.firstOrNull { it.id == detailId }
             if (detailId != null && detail != null) {
                 MedicineDetail(detail, state.periods.filter { it.medicineId == detail.id }, { fullImage = it }, { medicineEditor = detail }, { periodEditor = it }, {
-                    confirm = Confirmation("删除药品档案？", "将删除此药品的全部使用历史和关联首页条目，无法恢复。") { val image = detail.image; ReminderScheduler.mutex.withLock { repo.dao.deleteMedicine(detail.id) }; ImageStore(app).removeIfUnused(image, app.database); app.scheduler.scheduleAll(); detailId = null }
+                    confirm = Confirmation("删除药品档案？", "将删除此药品的全部使用历史和关联首页条目，无法恢复。") { val images = detail.photos(); ReminderScheduler.mutex.withLock { repo.dao.deleteMedicine(detail.id) }; images.forEach { ImageStore(app).removeIfUnused(it, app.database) }; app.scheduler.scheduleAll(); detailId = null }
                 })
             } else if (tab == 0) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -133,15 +140,19 @@ fun NotebookApp(app: MedApplication) {
         val g = editor.group ?: return@GroupDialog
         confirm = Confirmation("删除大类？", "取消此大类提醒并删除首页安排，药品库和历史记录会保留。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.dao.deleteGroup(g.id) }; groupEditor = null }
     }) }
-    itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, image -> perform { repo.saveItem(editor.groupId, editor.item?.id, selected, name, spec, dose, image); app.scheduler.schedule(editor.groupId); itemEditor = null } }, { med -> medicineEditor = med }, {
+    itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, images -> perform { repo.saveItem(editor.groupId, editor.item?.id, selected, name, spec, dose, images.firstOrNull(), encodePhotos(images)); app.scheduler.schedule(editor.groupId); itemEditor = null } }, { med -> medicineEditor = med }, {
         val i = editor.item ?: return@ItemDialog
         confirm = Confirmation("删除首页条目？", "只移除此处安排，药品库和使用历史会保留。") { repo.dao.deleteItem(i.id); app.scheduler.cancel(i.groupId); app.scheduler.schedule(i.groupId); itemEditor = null }
     }) }
-    medicineEditor?.let { med -> MedicineDialog(med, app, { medicineEditor = null }) { updated -> perform { repo.updateMedicine(updated); ImageStore(app).removeIfUnused(med.image, app.database); medicineEditor = null } } }
+    medicineEditor?.let { med -> MedicineDialog(med, app, { medicineEditor = null }) { updated -> perform { repo.updateMedicine(updated); med.photos().forEach { ImageStore(app).removeIfUnused(it, app.database) }; medicineEditor = null } } }
     periodEditor?.let { period -> PeriodDialog(period, { periodEditor = null }, { updated -> perform { repo.savePeriod(updated); periodEditor = null } }, { confirm = Confirmation("删除这段使用记录？", "只删除这段日期记录，不删除药品和首页安排。") { repo.dao.deletePeriod(period.id); periodEditor = null } }) }
     confirm?.let { c -> AlertDialog(onDismissRequest = { confirm = null }, title = { Text(c.title) }, text = { Text(c.text) }, confirmButton = { TextButton(onClick = { confirm = null; perform(c.action) }) { Text("删除", color = Color(0xFFB56F71)) } }, dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消") } }) }
     order?.let { o -> OrderDialog(o, { order = null }) { ids -> perform { o.save(ids); order = null } } }
-    fullImage?.let { path -> Dialog(onDismissRequest = { fullImage = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) { Surface(color = Color.White, modifier = Modifier.fillMaxSize()) { Box { AsyncImage(File(path), "药品大图", modifier = Modifier.fillMaxSize().padding(24.dp), contentScale = ContentScale.Fit); IconButton(onClick = { fullImage = null }, modifier = Modifier.align(Alignment.TopEnd).statusBarsPadding()) { Icon(Icons.Outlined.Close, "关闭大图") } } } } }
+    fullImage?.let { path ->
+        val photos = state.medicines.firstOrNull { path in it.photos() }?.photos() ?: listOf(path)
+        PhotoViewer(photos, photos.indexOf(path).coerceAtLeast(0)) { fullImage = null }
+    }
+
     if (permissionSheet) AlertDialog(onDismissRequest = { permissionSheet = false }, title = { Text("提醒权限") }, text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(permissionProblem ?: "通知与精确闹钟权限已具备。")
         Text("请在手机系统中允许后台运行或自启动。划掉最近任务通常仍可提醒；系统强行停止应用、关机或厂商后台限制可能阻止提醒。重启后需先解锁手机。", fontSize = 13.sp, color = Quiet)
@@ -192,7 +203,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                     }
                 }
             }
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(21.dp)).background(Color.White.copy(alpha = .64f)).padding(horizontal = 14.dp)) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(21.dp)).background(androidx.compose.ui.graphics.lerp(color, Color.White, .94f)).padding(horizontal = 14.dp)) {
                 state.items.filter { it.groupId == group.id }.forEach { item ->
                     val med = state.medicines.firstOrNull { it.id == item.medicineId }
                     if (med != null) {
@@ -208,7 +219,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                 med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
                             }
                         }
-                        HorizontalDivider(color = Ink.copy(alpha = .055f))
+                        Spacer(Modifier.height(2.dp))
                     }
                 }
                 TextButton(onClick = { addItem(group) }, contentPadding = PaddingValues(vertical = 9.dp, horizontal = 0.dp)) { Text("＋ 添加项目", color = accent.copy(alpha = .72f), fontSize = 13.sp) }
@@ -224,9 +235,9 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableIntStateOf(0) }
     Column(Modifier.padding(horizontal = 18.dp)) {
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("搜索药品名称") }, leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Quiet) }, singleLine = true, shape = RoundedCornerShape(18.dp))
+        SoftTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("搜索药品名称") }, leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Quiet) }, singleLine = true, shape = RoundedCornerShape(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 10.dp)) {
-            listOf("全部", "当前使用", "已停用").forEachIndexed { i, text -> FilterChip(selected = filter == i, onClick = { filter = i }, label = { Text(text) }) }
+            listOf("全部", "当前使用", "已停用").forEachIndexed { i, text -> FilterChip(border = null, selected = filter == i, onClick = { filter = i }, label = { Text(text) }) }
         }
         val meds = state.medicines.filter { med -> med.name.contains(query, ignoreCase = true) && when (filter) { 1 -> state.periods.any { it.medicineId == med.id && it.active }; 2 -> state.periods.none { it.medicineId == med.id && it.active }; else -> true } }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp), contentPadding = PaddingValues(bottom = 20.dp)) {
@@ -249,7 +260,7 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
 private fun MedicineDetail(med: Medicine, periods: List<UsePeriod>, image: (String) -> Unit, edit: () -> Unit, period: (UsePeriod) -> Unit, delete: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { Text(med.name, fontSize = 25.sp, fontWeight = FontWeight.Bold); if (med.specification.isNotBlank()) Text(med.specification, color = Quiet); if (med.defaultDose.isNotBlank()) Text("记录用量：${med.defaultDose}", fontSize = 13.sp, color = Quiet) }
-        med.image?.let { path -> item { AsyncImage(File(path), "药品图片", Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(18.dp)).clickable { image(path) }, contentScale = ContentScale.Fit) } }
+        if (med.photos().isNotEmpty()) item { PhotoStrip(med.photos(), image) }
         item { TextButton(onClick = edit) { Text("编辑药品资料") } }
         item { Text("使用记录", fontWeight = FontWeight.SemiBold); Text("日期可留空，重新使用时添加新记录", fontSize = 12.sp, color = Quiet) }
         items(periods, key = { it.id }) { p ->
@@ -273,8 +284,8 @@ private fun CardDialog(card: NoteCard, dismiss: () -> Unit, save: (NoteCard) -> 
     var name by remember(card.id) { mutableStateOf(card.name) }
     var color by remember(card.id) { mutableIntStateOf(card.color) }
     EditorDialog(if (card.id == 0L) "添加卡片" else "编辑卡片", dismiss, { save(card.copy(name = name.trim(), color = color)) }) {
-        OutlinedTextField(name, { name = it }, label = { Text("名称（可不填）") }, modifier = Modifier.fillMaxWidth())
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { Colors.forEachIndexed { i, c -> Box(Modifier.size(35.dp).clip(RoundedCornerShape(12.dp)).background(c).then(if (i == color) Modifier.border(2.dp, Accents[i], RoundedCornerShape(12.dp)) else Modifier).clickable { color = i }) } }
+        SoftTextField(name, { name = it }, label = { Text("名称（可不填）") }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { Colors.forEachIndexed { i, c -> Box(Modifier.size(35.dp).clip(RoundedCornerShape(12.dp)).background(c).clickable { color = i }, contentAlignment = Alignment.Center) { if (i == color) Icon(Icons.Outlined.Check, "已选配色", tint = Accents[i]) } } }
     }
 }
 
@@ -289,57 +300,56 @@ private fun GroupDialog(editor: GroupEditor, existing: Reminder?, dismiss: () ->
     EditorDialog(if (editor.group == null) "添加大类" else "编辑大类", dismiss, {
         if (name.isBlank()) error = "请填写大类名称" else save(editor.group?.copy(name = name.trim()) ?: NoteGroup(cardId = editor.cardId, name = name.trim()), Reminder(editor.group?.id ?: 0, hour, minute, enabled))
     }) {
-        OutlinedTextField(name, { name = it; error = null }, label = { Text("大类名称") }, modifier = Modifier.fillMaxWidth(), isError = error != null)
+        SoftTextField(name, { name = it; error = null }, label = { Text("大类名称") }, modifier = Modifier.fillMaxWidth(), isError = error != null)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { TimePickerDialog(context, { _, h, m -> hour = h; minute = m; enabled = true }, hour ?: 0, minute ?: 0, true).show() }) { Text(if (hour != null && minute != null) "%02d:%02d".format(hour, minute) else "设置时间（可不填）") }
             if (hour != null) TextButton(onClick = { hour = null; minute = null; enabled = false }) { Text("清除") }
         }
-        if (hour != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("每日提醒", Modifier.weight(1f)); Switch(enabled, { enabled = it }) }
+        if (hour != null) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("每日提醒", Modifier.weight(1f)); Switch(enabled, { enabled = it }, colors = SwitchDefaults.colors(uncheckedBorderColor = Color.Transparent)) }
         if (editor.group != null) TextButton(onClick = delete) { Text("删除大类", color = Color(0xFFB56F71)) }
     }
 }
 
 @Composable
-private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication, dismiss: () -> Unit, save: (Long?, String, String, String, String?) -> Unit, editMedicine: (Medicine) -> Unit, delete: () -> Unit) {
+private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication, dismiss: () -> Unit, save: (Long?, String, String, String, List<String>) -> Unit, editMedicine: (Medicine) -> Unit, delete: () -> Unit) {
     val original = state.medicines.firstOrNull { it.id == editor.item?.medicineId }
     var selectedId by remember { mutableStateOf(original?.id) }
     val selected = state.medicines.firstOrNull { it.id == selectedId }
     var name by remember { mutableStateOf(original?.name ?: "") }
     var spec by remember { mutableStateOf(original?.specification ?: "") }
     var dose by remember { mutableStateOf(editor.item?.dose ?: "") }
-    var image by remember { mutableStateOf(original?.image) }
+    var images by remember { mutableStateOf(original?.photos() ?: emptyList()) }
     var chooser by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val imported = remember { mutableListOf<String>() }
     DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) scope.launch { loading = true; try { image = ImageStore(app).import(uri).also { imported.add(it) } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) scope.launch { loading = true; try { for (uri in uris) { val path = ImageStore(app).import(uri).also { imported.add(it) }; images = images + path } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } }
     }
     EditorDialog(if (editor.item == null) "添加项目" else "编辑项目", dismiss, {
-        if (loading) error = "正在保存图片" else if ((selected?.name ?: name).isBlank()) error = "请填写名称" else save(selectedId, selected?.name ?: name, selected?.specification ?: spec, dose, selected?.image ?: image)
+        if (loading) error = "正在保存图片" else if ((selected?.name ?: name).isBlank()) error = "请填写名称" else save(selectedId, selected?.name ?: name, selected?.specification ?: spec, dose, selected?.photos() ?: images)
     }) {
-        Row { TextButton(onClick = { chooser = true }) { Text("从药品库选择") }; if (selectedId != null) TextButton(onClick = { selectedId = null; name = ""; spec = ""; image = null }) { Text("新建药品") } }
+        Row { TextButton(onClick = { chooser = true }) { Text("从药品库选择") }; if (selectedId != null) TextButton(onClick = { selectedId = null; name = ""; spec = ""; images = emptyList() }) { Text("新建药品") } }
         if (selected != null) {
             Text(selected.name, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             if (selected.specification.isNotBlank()) Text(selected.specification, color = Quiet, fontSize = 12.sp)
             TextButton(onClick = { editMedicine(selected) }) { Text("编辑药品名称、规格或图片", fontSize = 12.sp) }
         } else {
-            OutlinedTextField(name, { name = it; error = null }, label = { Text("药品或护理名称") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, placeholder = { Text("如 20mg") }, modifier = Modifier.fillMaxWidth())
+            SoftTextField(name, { name = it; error = null }, label = { Text("药品或护理名称") }, modifier = Modifier.fillMaxWidth())
+            SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, placeholder = { Text("如 20mg") }, modifier = Modifier.fillMaxWidth())
         }
-        OutlinedTextField(dose, { dose = it }, label = { Text("每次用量") }, placeholder = { Text("如 1片、2粒、1次") }, modifier = Modifier.fillMaxWidth())
-        val path = if (selected != null) selected.image else image
-        path?.let { AsyncImage(File(it), "药品图片预览", Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop) }
-        if (selected == null) Row { TextButton(onClick = { launcher.launch("image/*") }, enabled = !loading) { Text(if (loading) "正在保存图片…" else if (image == null) "选择图片（可不填）" else "更换图片") }; if (image != null) TextButton(onClick = { image = null }) { Text("移除图片") } }
+        SoftTextField(dose, { dose = it }, label = { Text("每次用量") }, placeholder = { Text("如 1片、2粒、1次") }, modifier = Modifier.fillMaxWidth())
+        PhotoEditor(selected?.photos() ?: images, loading, selected == null,
+            { launcher.launch("image/*") }, { path -> images = images - path })
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
         if (editor.item != null) TextButton(onClick = delete) { Text("删除首页条目", color = Color(0xFFB56F71)) }
     }
     if (chooser) {
         var query by remember { mutableStateOf("") }
-        AlertDialog(onDismissRequest = { chooser = false }, title = { Text("选择药品") }, text = { Column { OutlinedTextField(query, { query = it }, label = { Text("搜索名称") }); LazyColumn(Modifier.heightIn(max = 300.dp)) {
+        AlertDialog(onDismissRequest = { chooser = false }, title = { Text("选择药品") }, text = { Column { SoftTextField(query, { query = it }, label = { Text("搜索名称") }); LazyColumn(Modifier.heightIn(max = 300.dp)) {
             items(state.medicines.filter { it.name.contains(query, ignoreCase = true) }, key = { it.id }) { med -> TextButton(onClick = { selectedId = med.id; dose = med.defaultDose; chooser = false }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(med.name); if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet) } } }
         } } }, confirmButton = { TextButton(onClick = { chooser = false }) { Text("取消") } })
     }
@@ -350,20 +360,19 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
     var name by remember { mutableStateOf(med.name) }
     var spec by remember { mutableStateOf(med.specification) }
     var dose by remember { mutableStateOf(med.defaultDose) }
-    var image by remember { mutableStateOf(med.image) }
+    var images by remember { mutableStateOf(med.photos()) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val imported = remember { mutableListOf<String>() }
     DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> if (uri != null) scope.launch { loading = true; try { image = ImageStore(app).import(uri).also { imported.add(it) } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
-    EditorDialog("编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, image = image)) }) {
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (uris.isNotEmpty()) scope.launch { loading = true; try { for (uri in uris) { val path = ImageStore(app).import(uri).also { imported.add(it) }; images = images + path } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
+    EditorDialog("编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
         Text("名称、规格和图片会同步用于引用此药品的首页条目。各条目的用量保持独立。", fontSize = 12.sp, color = Quiet)
-        OutlinedTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(dose, { dose = it }, label = { Text("复用时带出的用量（可不填）") }, modifier = Modifier.fillMaxWidth())
-        image?.let { AsyncImage(File(it), "图片预览", Modifier.size(80.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop) }
-        Row { TextButton(onClick = { launcher.launch("image/*") }, enabled = !loading) { Text(if (loading) "正在保存…" else "选择图片") }; if (image != null) TextButton(onClick = { image = null }) { Text("移除图片") } }
+        SoftTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())
+        SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, modifier = Modifier.fillMaxWidth())
+        SoftTextField(dose, { dose = it }, label = { Text("复用时带出的用量（可不填）") }, modifier = Modifier.fillMaxWidth())
+        PhotoEditor(images, loading, true, { launcher.launch("image/*") }, { path -> images = images - path })
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
 }
@@ -378,10 +387,10 @@ private fun PeriodDialog(period: UsePeriod, dismiss: () -> Unit, save: (UsePerio
         val a = start.trim().ifBlank { null }; val b = if (active) null else end.trim().ifBlank { null }
         try { validateDates(a, b); save(period.copy(start = a, end = b, active = active)) } catch (_: Exception) { error = "请用 YYYY-MM-DD 格式，停用日期不能早于开始日期" }
     }) {
-        OutlinedTextField(start, { start = it; error = null }, label = { Text("开始日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
-        if (period.id == 0L || period.active) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("当前使用", Modifier.weight(1f)); Switch(active, { active = it }) }
+        SoftTextField(start, { start = it; error = null }, label = { Text("开始日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
+        if (period.id == 0L || period.active) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("当前使用", Modifier.weight(1f)); Switch(active, { active = it }, colors = SwitchDefaults.colors(uncheckedBorderColor = Color.Transparent)) }
         else Text("此段已停用。再次使用请添加新的使用记录，原有日期会保留。", fontSize = 12.sp, color = Quiet)
-        if (!active) OutlinedTextField(end, { end = it; error = null }, label = { Text("停用日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
+        if (!active) SoftTextField(end, { end = it; error = null }, label = { Text("停用日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
         if (period.id != 0L) TextButton(onClick = delete) { Text("删除这段记录", color = Color(0xFFB56F71)) }
     }

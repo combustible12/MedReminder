@@ -15,7 +15,7 @@ data class NoteCard(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name:
 @Entity(tableName = "groups", foreignKeys = [ForeignKey(entity = NoteCard::class, parentColumns = ["id"], childColumns = ["cardId"], onDelete = ForeignKey.CASCADE)], indices = [Index("cardId")])
 data class NoteGroup(@PrimaryKey(autoGenerate = true) val id: Long = 0, val cardId: Long, val name: String, val position: Int = 0)
 @Entity(tableName = "medicines", indices = [Index(value = ["identity"], unique = true)])
-data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification))
+data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification), @ColumnInfo(defaultValue = "''") val imagesJson: String = "")
 @Entity(tableName = "items", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = Medicine::class, parentColumns = ["id"], childColumns = ["medicineId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId"), Index("medicineId")])
 data class NoteItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val groupId: Long, val medicineId: Long, val dose: String, val position: Int = 0)
 @Entity(tableName = "periods", foreignKeys = [ForeignKey(entity = Medicine::class, parentColumns = ["id"], childColumns = ["medicineId"], onDelete = ForeignKey.CASCADE)], indices = [Index("medicineId")])
@@ -72,9 +72,15 @@ interface MedDao {
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM items WHERE groupId=:groupId") suspend fun nextItem(groupId: Long): Int
 }
 
-@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class], version = 1, exportSchema = true)
+@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class], version = 2, exportSchema = true)
 abstract class MedDatabase : RoomDatabase() {
     abstract fun dao(): MedDao
+}
+
+val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE medicines ADD COLUMN imagesJson TEXT NOT NULL DEFAULT ''")
+    }
 }
 
 class Repository(val db: MedDatabase) {
@@ -87,7 +93,7 @@ class Repository(val db: MedDatabase) {
         dao.putReminder(reminder.copy(groupId = id, enabled = reminder.enabled && reminder.hour != null && reminder.minute != null))
         id
     }
-    suspend fun saveItem(groupId: Long, itemId: Long?, selectedId: Long?, name: String, spec: String, dose: String, image: String?): Long = db.withTransaction {
+    suspend fun saveItem(groupId: Long, itemId: Long?, selectedId: Long?, name: String, spec: String, dose: String, image: String?, imagesJson: String = ""): Long = db.withTransaction {
         require(name.isNotBlank()) { "请填写名称" }
         val old = itemId?.let { dao.item(it) }
         if (itemId != null) requireNotNull(old) { "条目已被删除" }
@@ -96,8 +102,8 @@ class Repository(val db: MedDatabase) {
         if (selectedId != null) requireNotNull(selected) { "药品已被删除" }
         // Editing an arrangement may select a different identity; it must not rename every other arrangement.
         val med = selected ?: dao.findMedicine(identityOf(name, spec))
-        if (selected == null && med != null && image != null && image != med.image) dao.updateMedicine(med.copy(image = image))
-        val medId = med?.id ?: dao.insertMedicine(Medicine(name = name.trim(), specification = spec.trim(), defaultDose = dose.trim(), image = image))
+        if (selected == null && med != null && image != null && image != med.image) dao.updateMedicine(med.copy(image = image, imagesJson = imagesJson))
+        val medId = med?.id ?: dao.insertMedicine(Medicine(name = name.trim(), specification = spec.trim(), defaultDose = dose.trim(), image = image, imagesJson = imagesJson))
         if (dao.medicinePeriods(medId).none { it.active }) dao.insertPeriod(UsePeriod(medicineId = medId))
         if (old == null) dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId)))
         else { dao.updateItem(old.copy(medicineId = medId, dose = dose.trim())); old.id }
@@ -134,7 +140,7 @@ class ImageStore(private val context: Context) {
     }
     // Only unreferenced, saved images are removed; deleting a home arrangement never touches images.
     suspend fun removeIfUnused(path: String?, db: MedDatabase) = withContext(Dispatchers.IO) {
-        if (path != null && db.dao().medicines().first().none { it.image == path }) {
+        if (path != null && db.dao().medicines().first().none { path in it.photos() }) {
             val file = File(path)
             if (file.canonicalFile.parentFile == File(context.filesDir, "medicine-images").canonicalFile) file.delete()
         }
@@ -143,8 +149,16 @@ class ImageStore(private val context: Context) {
 
 class MedApplication : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").build() }
+    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2).build() }
     val repository by lazy { Repository(database) }
     val scheduler by lazy { ReminderScheduler(this, database) }
     override fun onCreate() { super.onCreate(); scheduler.createChannel() }
 }
+
+// Preserve the original image column as the cover for existing installs and reminders.
+fun Medicine.photos(): List<String> = (listOfNotNull(image) + decodePhotos(imagesJson)).distinct()
+fun decodePhotos(value: String): List<String> = if (value.isBlank()) emptyList() else runCatching {
+    val array = org.json.JSONArray(value)
+    (0 until array.length()).map { array.getString(it) }.filter { it.isNotBlank() }
+}.getOrDefault(emptyList())
+fun encodePhotos(paths: List<String>): String = org.json.JSONArray(paths.distinct()).toString()
