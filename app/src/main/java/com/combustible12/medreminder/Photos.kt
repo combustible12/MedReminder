@@ -19,6 +19,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import coil.compose.AsyncImage
 import java.io.File
 import androidx.compose.ui.draw.clip
@@ -105,7 +107,7 @@ internal fun PhotoViewer(paths: List<String>, initialIndex: Int, dismiss: () -> 
                             }
                         }
                     }) {
-                    AsyncImage(File(paths[index]), "药品大图", Modifier.fillMaxSize().graphicsLayer {
+                    AsyncImage(File(paths[index]), "药品大图", Modifier.fillMaxSize().semantics { stateDescription = "缩放${(scale * 100).toInt()}%" }.graphicsLayer {
                         scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
                     }, contentScale = ContentScale.Fit)
                 }

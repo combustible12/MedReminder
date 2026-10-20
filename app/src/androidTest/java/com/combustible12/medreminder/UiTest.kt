@@ -8,6 +8,7 @@ import org.junit.Rule
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Test
 
@@ -78,8 +79,28 @@ class UiTest {
         file.parentFile!!.mkdirs()
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
         logScreenshot(file)
+        runBlocking {
+            val med = app.repository.dao.medicines().first().first()
+            val second = java.io.File(app.filesDir, "qa-second.png")
+            java.io.File(med.image!!).copyTo(second, overwrite = true)
+            app.repository.updateMedicine(med.copy(imagesJson = encodePhotos(listOf(med.image!!, second.path))))
+        }
+        compose.waitForIdle()
         compose.onNodeWithContentDescription("查看示例药品 1图片").performClick()
         compose.onNodeWithContentDescription("药品大图").assertIsDisplayed()
+        compose.onNodeWithText("1 / 2").assertIsDisplayed()
+        compose.onNodeWithContentDescription("药品大图").performTouchInput {
+            pinch(center - androidx.compose.ui.geometry.Offset(30f, 0f), center + androidx.compose.ui.geometry.Offset(30f, 0f), center - androidx.compose.ui.geometry.Offset(100f, 0f), center + androidx.compose.ui.geometry.Offset(100f, 0f))
+        }
+        compose.onNodeWithContentDescription("药品大图").assert(SemanticsMatcher("image is zoomed") {
+            it.config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.StateDescription) { "" } != "缩放100%"
+        })
+        compose.onNodeWithText("恢复原图").performClick()
+        compose.onNodeWithContentDescription("药品大图").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "缩放100%"))
+        compose.onNodeWithContentDescription("药品大图").performTouchInput { swipeLeft() }
+        compose.onNodeWithText("2 / 2").assertIsDisplayed()
+        compose.onNodeWithContentDescription("上一张").performClick()
+        compose.onNodeWithText("1 / 2").assertIsDisplayed()
         compose.onNodeWithContentDescription("关闭大图").performClick()
         compose.onNodeWithText("示例药品 1").assertIsDisplayed()
     }

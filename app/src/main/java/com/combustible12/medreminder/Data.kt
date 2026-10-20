@@ -102,7 +102,10 @@ class Repository(val db: MedDatabase) {
         if (selectedId != null) requireNotNull(selected) { "药品已被删除" }
         // Editing an arrangement may select a different identity; it must not rename every other arrangement.
         val med = selected ?: dao.findMedicine(identityOf(name, spec))
-        if (selected == null && med != null && image != null && image != med.image) dao.updateMedicine(med.copy(image = image, imagesJson = imagesJson))
+        if (selected == null && med != null && image != null) {
+            val photos = (med.photos() + image + decodePhotos(imagesJson)).distinct()
+            dao.updateMedicine(med.copy(image = photos.firstOrNull(), imagesJson = encodePhotos(photos)))
+        }
         val medId = med?.id ?: dao.insertMedicine(Medicine(name = name.trim(), specification = spec.trim(), defaultDose = dose.trim(), image = image, imagesJson = imagesJson))
         if (dao.medicinePeriods(medId).none { it.active }) dao.insertPeriod(UsePeriod(medicineId = medId))
         if (old == null) dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId)))
