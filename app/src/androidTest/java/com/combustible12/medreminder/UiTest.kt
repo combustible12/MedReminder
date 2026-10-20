@@ -62,6 +62,30 @@ class UiTest {
     }
     @Test fun referenceLayoutAndImageViewer() {
         val app = compose.activity.application as MedApplication
+        val launcher = app.packageManager.getApplicationIcon(app.packageName).mutate()
+        org.junit.Assert.assertTrue(launcher is android.graphics.drawable.AdaptiveIconDrawable)
+        val adaptive = launcher as android.graphics.drawable.AdaptiveIconDrawable
+        val iconPreview = Bitmap.createBitmap(768, 256, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(iconPreview)
+        canvas.drawColor(android.graphics.Color.LTGRAY)
+        adaptive.setBounds(0, 0, 256, 256)
+        for (shape in 0..2) {
+            canvas.save()
+            canvas.translate(shape * 256f, 0f)
+            if (shape == 0) adaptive.draw(canvas) else {
+                val mask = android.graphics.Path()
+                if (shape == 1) mask.addCircle(128f, 128f, 128f, android.graphics.Path.Direction.CW)
+                else mask.addRoundRect(0f, 0f, 256f, 256f, 58f, 58f, android.graphics.Path.Direction.CW)
+                canvas.clipPath(mask)
+                adaptive.background.draw(canvas)
+                adaptive.foreground.draw(canvas)
+            }
+            canvas.restore()
+        }
+        val iconFile = java.io.File(compose.activity.getExternalFilesDir("qa"), "launcher-masks.png")
+        iconFile.parentFile!!.mkdirs()
+        iconFile.outputStream().use { iconPreview.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        logScreenshot(iconFile)
         runBlocking {
             val repo = app.repository
             val image = java.io.File(app.filesDir, "qa-picture.png")

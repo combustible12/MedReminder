@@ -123,7 +123,7 @@ jobs:
             adb install /tmp/MedReminder-old.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
-            adb install -r release/MedReminder-1.0.2.apk
+            adb install -r release/MedReminder-1.0.3.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
             adb shell pidof com.combustible12.medreminder
@@ -132,5 +132,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.2-build.${{ github.run_number }}"
-          gh release create "$TAG" release/MedReminder-1.0.2.apk --title "MedReminder 1.0.2" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
+          TAG="v1.0.3-build.${{ github.run_number }}"
+          gh release create "$TAG" release/MedReminder-1.0.3.apk --title "MedReminder 1.0.3" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
