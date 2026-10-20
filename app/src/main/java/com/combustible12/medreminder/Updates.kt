@@ -133,7 +133,7 @@ fun AppUpdateButton() {
             updater.install(file); "请在系统界面确认安装"
         }.getOrElse { it.message ?: "安装未完成，请重试" }
     }
-    Column(Modifier.fillMaxWidth().padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF829BCD))
         if (status.isNotBlank()) Text(status, color = Color(0xFF8C929C), fontSize = 12.sp)
         Button(onClick = {
