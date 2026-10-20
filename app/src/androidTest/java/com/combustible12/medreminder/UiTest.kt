@@ -41,6 +41,9 @@ class UiTest {
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
         logScreenshot(file)
         compose.onNodeWithText("1次").assertIsDisplayed()
+        val doseCenter = compose.onNodeWithText("1次").fetchSemanticsNode().boundsInRoot.center.x
+        val screenWidth = compose.onRoot().fetchSemanticsNode().boundsInRoot.width
+        org.junit.Assert.assertTrue("Dose stays in the middle even without a picture", doseCenter / screenWidth in .40f.. .70f)
         compose.onNodeWithText("20mg").assertDoesNotExist()
         compose.onNodeWithText("药品库").performClick()
         compose.onNodeWithText("测试护理").assertIsDisplayed()

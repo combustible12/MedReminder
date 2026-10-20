@@ -196,12 +196,16 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                     val med = state.medicines.firstOrNull { it.id == item.medicineId }
                     if (med != null) {
                         Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(vertical = 12.dp).heightIn(min = 45.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Column(Modifier.weight(1f)) {
+                            Column(Modifier.weight(.45f)) {
                                 Text(med.name, fontSize = 19.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                 if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet, modifier = Modifier.padding(top = 3.dp))
                             }
-                            Text(item.dose, fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink, modifier = Modifier.widthIn(max = 105.dp))
-                            med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
+                            Box(Modifier.weight(.25f), contentAlignment = Alignment.Center) {
+                                Text(item.dose, fontSize = 25.sp, fontWeight = FontWeight.Bold, color = Ink)
+                            }
+                            Box(Modifier.weight(.30f), contentAlignment = Alignment.CenterEnd) {
+                                med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
+                            }
                         }
                         HorizontalDivider(color = Ink.copy(alpha = .055f))
                     }
