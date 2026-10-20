@@ -73,12 +73,14 @@ internal class AppUpdater(private val context: Context) {
     @Suppress("DEPRECATION")
     fun validate(file: File): Boolean {
         val pm = context.packageManager
-        val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+        // GET_SIGNATURES also populates archive certificates reliably on Android 9.
+        // This app uses one fixed signing key; signing-key rotation is not supported.
+        val flags = PackageManager.GET_SIGNATURES
         val apk = pm.getPackageArchiveInfo(file.path, flags) ?: error("安装包无效，请重新下载")
         require(apk.packageName == context.packageName) { "安装包应用标识不匹配" }
         val current = pm.getPackageInfo(context.packageName, flags)
-        val old = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
-        val fresh = if (Build.VERSION.SDK_INT >= 28) apk.signingInfo?.apkContentsSigners else apk.signatures
+        val old = current.signatures
+        val fresh = apk.signatures
         require(!old.isNullOrEmpty() && !fresh.isNullOrEmpty() && old.toSet() == fresh.toSet()) { "安装包签名不一致，无法覆盖升级" }
         val nextVersion = if (Build.VERSION.SDK_INT >= 28) apk.longVersionCode else apk.versionCode.toLong()
         val installed = if (Build.VERSION.SDK_INT >= 28) current.longVersionCode else current.versionCode.toLong()
