@@ -15,7 +15,8 @@ class UiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private fun logScreenshot(file: java.io.File) {
         val chunks = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP).chunked(3000)
-        chunks.forEachIndexed { index, chunk -> android.util.Log.i("MedReminderQA", "${file.name}:$index/${chunks.size}:$chunk") }
+        chunks.forEachIndexed { index, chunk -> android.util.Log.i("MedReminderQA", "${file.name}:$index/${chunks.size}:$chunk"); Thread.sleep(5) }
+        Thread.sleep(150)
     }
     @Before fun reset() = runBlocking { withContext(Dispatchers.IO) { (compose.activity.application as MedApplication).database.clearAllTables() } }
     @After fun cleanup() = reset()
