@@ -5,7 +5,8 @@
 - Android 16（API 36）8 项设备测试及 JVM 测试全部通过。
 - 验收工作流：https://github.com/combustible12/MedReminder/actions/runs/39387519866
 - 保持原签名，版本 1.0.3 / versionCode 4；原有界面、功能和数据结构不变。
-- 最终覆盖安装与启动检查由发布工作流完成。
+- 最终签名包覆盖旧版安装、启动检查通过，已发布 v1.0.3-build.22。
+- 最终发布工作流：https://github.com/combustible12/MedReminder/actions/runs/39388454252
 
 以下为历史版本记录。
 
