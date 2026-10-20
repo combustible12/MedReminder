@@ -19,6 +19,11 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
     testOptions { unitTests.isIncludeAndroidResources = true; animationsDisabled = true }
+    buildTypes.getByName("release") {
+        isMinifyEnabled = true
+        isShrinkResources = true
+        proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+    }
     val signingPath = System.getenv("MED_SIGNING_PATH")
     if (!signingPath.isNullOrBlank()) {
         signingConfigs.create("personal") {

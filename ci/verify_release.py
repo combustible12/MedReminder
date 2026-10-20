@@ -1,6 +1,8 @@
 import hashlib, json, pathlib, subprocess, os
 root = pathlib.Path(__file__).resolve().parents[1]
 metadata = json.loads((root / 'release/ready.json').read_text())
+source_paths = {str(p.relative_to(root)) for p in (root / 'app/src/main').rglob('*') if p.is_file()} | {'app/build.gradle.kts', 'build.gradle.kts', 'settings.gradle.kts', 'gradle.properties'}
+assert source_paths == set(metadata['sources']), 'APK source file list changed'
 for filename, expected in metadata['sources'].items():
     actual = hashlib.sha256((root / filename).read_bytes()).hexdigest()
     if actual != expected:

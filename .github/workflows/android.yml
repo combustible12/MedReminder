@@ -2,13 +2,16 @@ name: Android build and acceptance
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
   pull_request:
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
   group: android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,6 +34,10 @@ jobs:
         with:
           name: unit-test-results
           path: app/build/reports/tests/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MedReminder-debug-installable
+          path: app/build/outputs/apk/debug/*.apk
       - uses: actions/upload-artifact@v4
         with:
           name: unsigned-release-apk
@@ -95,6 +102,25 @@ jobs:
       - name: Verify signed deliverable and source binding
         if: steps.ready.outputs.exists == 'true'
         run: python3 ci/verify_release.py
+      - name: Enable KVM for signed APK smoke test
+        if: steps.ready.outputs.exists == 'true'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and launch signed release
+        if: steps.ready.outputs.exists == 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install release/MedReminder-1.0.0.apk
+            adb shell am start -W -n com.combustible12.medreminder/.MainActivity
+            adb shell sleep 3
+            adb shell pidof com.combustible12.medreminder
       - name: Publish installable APK
         if: steps.ready.outputs.exists == 'true'
         env:

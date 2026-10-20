@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "versionCode": 1,
+  "sha256": "43f1cd5a42985e6f0b04220c19f77ba259a339a5955c737cdeda6dfc10b4addd",
+  "sources": {
+    "app/build.gradle.kts": "15af27f64470104713309b57fb7d6926d94295b206e452f11c827bb3e8531f29",
+    "app/src/main/AndroidManifest.xml": "3ab13b21b6750cfd842dd71f612192bed9d1ef94db9c245d402f9d9ab5804853",
+    "app/src/main/java/com/combustible12/medreminder/Data.kt": "c0e979e4f44b602a9c738f438398375d728db4082fb3326929d50c3f78d72d3b",
+    "app/src/main/java/com/combustible12/medreminder/MainActivity.kt": "00b6e0f56f10acc5cbce3d5200bdf89a373618268ea49515e6f9293251ed9061",
+    "app/src/main/java/com/combustible12/medreminder/Reminders.kt": "a62e6c204065d284ef107b21bf92f5e796124957a527a30ce18e04030719e103",
+    "app/src/main/res/drawable/ic_med.xml": "1b51e52a058af692ff4d4d823fb3e9fb84dc3e317b75ac131a5cc6527b7a9af5",
+    "app/src/main/res/values/styles.xml": "6c3bc818c60884fa4eee754affdeadbfc9ffb28d3b94bfe5efd9598cc869ec29",
+    "build.gradle.kts": "3ae8b428d467df61d07b71e35c4bd7cf5978c9dae6b7020c5fca761cf90df281",
+    "gradle.properties": "1b8bb263791571896a03bbff7b73ff8ce8bc73de9fd69fc5e04749af7b428905",
+    "settings.gradle.kts": "3d5d5e557b3b901178209d22a509f77996f330a8d257a089aef2f3796229d003"
+  }
+}

@@ -18,7 +18,7 @@ import java.time.ZonedDateTime
 @RunWith(AndroidJUnit4::class)
 class ReminderTest {
     private fun shell(command: String) {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command).use { descriptor -> java.io.FileInputStream(descriptor.fileDescriptor).use { it.readBytes() } }
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).use { it.readBytes() }
     }
     @Test fun alarmFiresOnLockScreenAndUsesLatestDoses() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -61,8 +61,8 @@ class ReminderTest {
         if (Build.VERSION.SDK_INT < 33) return@runBlocking
         val context = ApplicationProvider.getApplicationContext<Context>()
         val app = context.applicationContext as MedApplication
-        shell("pm revoke ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}")
+        shell("appops set ${context.packageName} POST_NOTIFICATION deny")
         try { assertNotNull(app.scheduler.permissionProblem()) }
-        finally { shell("pm grant ${context.packageName} ${Manifest.permission.POST_NOTIFICATIONS}") }
+        finally { shell("appops set ${context.packageName} POST_NOTIFICATION allow") }
     }
 }
