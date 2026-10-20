@@ -1,0 +1,22 @@
+package com.combustible12.medreminder
+
+import org.junit.Assert.*
+import org.junit.Test
+import java.time.ZonedDateTime
+
+class RulesTest {
+    @Test fun blankTimeDoesNotDisplay() { assertNull(Reminder(1).time()); assertEquals("08:05", Reminder(1, 8, 5).time()) }
+    @Test fun identityUsesNameAndSpecificationOnly() { assertEquals(identityOf(" 药品 A ", "20mg"), identityOf("药品 A", "20mg ")); assertNotEquals(identityOf("药品 A", "20mg"), identityOf("药品 A", "40mg")) }
+    @Test fun nextDailyAlarmUsesTomorrowWhenTimePassed() {
+        val now = ZonedDateTime.parse("2026-10-20T08:00:00+08:00[Asia/Shanghai]")
+        assertEquals("2026-10-21T08:00+08:00[Asia/Shanghai]", nextReminder(8, 0, now).toString())
+        assertEquals("2026-10-20T08:30+08:00[Asia/Shanghai]", nextReminder(8, 30, now).toString())
+    }
+    @Test fun dailyAlarmKeepsWallClockAcrossDST() {
+        val now = ZonedDateTime.parse("2026-10-31T09:00:00-04:00[America/New_York]")
+        val next = nextReminder(8, 0, now)
+        assertEquals(8, next.hour); assertEquals(1, next.dayOfMonth); assertEquals(-5 * 3600, next.offset.totalSeconds)
+    }
+    @Test fun optionalDatesAndMultiplePeriods() { validateDates(null, null); validateDates("2026-09-01", "2026-09-15") }
+    @Test(expected = IllegalArgumentException::class) fun reversedDatesRejected() { validateDates("2026-10-20", "2026-10-19") }
+}
