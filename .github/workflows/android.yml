@@ -33,7 +33,9 @@ jobs:
         if: always()
         with:
           name: unit-test-results
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/schemas/
       - uses: actions/upload-artifact@v4
         with:
           name: MedReminder-debug-installable
@@ -121,7 +123,7 @@ jobs:
             adb install /tmp/MedReminder-old.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
-            adb install -r release/MedReminder-1.0.1.apk
+            adb install -r release/MedReminder-1.0.2.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
             adb shell pidof com.combustible12.medreminder
@@ -130,5 +132,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.1-build.${{ github.run_number }}"
-          gh release create "$TAG" release/MedReminder-1.0.1.apk --title "MedReminder 1.0.1" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
+          TAG="v1.0.2-build.${{ github.run_number }}"
+          gh release create "$TAG" release/MedReminder-1.0.2.apk --title "MedReminder 1.0.2" --notes-file docs/RELEASE_NOTES.md --prerelease --target "${{ github.sha }}"
