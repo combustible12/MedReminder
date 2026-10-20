@@ -23,6 +23,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import coil.compose.AsyncImage
 import java.io.File
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.*
 import androidx.compose.ui.draw.clip
 
 @Composable
@@ -70,6 +72,9 @@ internal fun PhotoEditor(paths: List<String>, loading: Boolean, editable: Boolea
 @Composable
 internal fun PhotoViewer(paths: List<String>, initialIndex: Int, dismiss: () -> Unit) {
     if (paths.isEmpty()) return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var sharing by remember { mutableStateOf(false) }
     var index by remember(paths, initialIndex) { mutableIntStateOf(initialIndex.coerceIn(paths.indices)) }
     var scale by remember(index) { mutableFloatStateOf(1f) }
     var offset by remember(index) { mutableStateOf(Offset.Zero) }
@@ -110,6 +115,22 @@ internal fun PhotoViewer(paths: List<String>, initialIndex: Int, dismiss: () -> 
                     AsyncImage(File(paths[index]), "药品大图", Modifier.fillMaxSize().semantics { stateDescription = "缩放${(scale * 100).toInt()}%" }.graphicsLayer {
                         scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
                     }, contentScale = ContentScale.Fit)
+                }
+                TextButton(onClick = {
+                    val selectedPath = paths[index]
+                    sharing = true
+                    scope.launch {
+                        try {
+                            val intent = withContext(Dispatchers.IO) { imageShareIntent(context, selectedPath) }
+                            context.startActivity(android.content.Intent.createChooser(intent, "分享药品图片"))
+                        } catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { android.widget.Toast.makeText(context, "图片分享失败，请重试", android.widget.Toast.LENGTH_LONG).show() }
+                        finally { sharing = false }
+                    }
+                }, enabled = !sharing, modifier = Modifier.align(Alignment.TopStart)) {
+                    Icon(Icons.Outlined.Share, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (sharing) "准备中…" else "分享")
                 }
                 Text("${index + 1} / ${paths.size}", Modifier.align(Alignment.TopCenter).padding(18.dp))
                 IconButton(onClick = dismiss, modifier = Modifier.align(Alignment.TopEnd)) { Icon(Icons.Outlined.Close, "关闭大图") }

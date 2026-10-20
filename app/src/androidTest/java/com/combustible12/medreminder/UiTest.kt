@@ -134,6 +134,7 @@ class UiTest {
         compose.onNodeWithContentDescription("查看示例药品 1图片").performClick()
         compose.onNodeWithContentDescription("药品大图").assertIsDisplayed()
         compose.onNodeWithText("1 / 2").assertIsDisplayed()
+        compose.onNodeWithText("分享").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithContentDescription("药品大图").performTouchInput {
             pinch(center - androidx.compose.ui.geometry.Offset(30f, 0f), center + androidx.compose.ui.geometry.Offset(30f, 0f), center - androidx.compose.ui.geometry.Offset(100f, 0f), center + androidx.compose.ui.geometry.Offset(100f, 0f))
         }
@@ -146,6 +147,7 @@ class UiTest {
         compose.onNodeWithText("2 / 2").assertIsDisplayed()
         compose.onNodeWithContentDescription("上一张").performClick()
         compose.onNodeWithText("1 / 2").assertIsDisplayed()
+        compose.onNodeWithText("分享").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithContentDescription("关闭大图").performClick()
         compose.onNodeWithText("示例药品 1").assertIsDisplayed()
     }
