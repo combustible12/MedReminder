@@ -131,7 +131,7 @@ internal class AppUpdater(private val context: Context) {
 }
 
 @Composable
-fun AppUpdateButton() {
+fun AppUpdateButton(compact: Boolean = false) {
     val context = LocalContext.current
     val updater = remember(context) { AppUpdater(context) }
     val scope = rememberCoroutineScope()
@@ -144,9 +144,10 @@ fun AppUpdateButton() {
             updater.install(file); "请在系统界面确认安装"
         }.getOrElse { it.message ?: "安装未完成，请重试" }
     }
-    Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF829BCD))
-        if (status.isNotBlank()) Text(status, color = Color(0xFF8C929C), fontSize = 12.sp)
+    if (compact && status.isNotBlank()) androidx.compose.material3.AlertDialog(onDismissRequest = { status = "" }, title = { Text("应用更新") }, text = { Column { Text(status); if (busy) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 12.dp)) } }, confirmButton = { androidx.compose.material3.TextButton(onClick = { status = "" }) { Text("关闭") } })
+    Column(if (compact) Modifier else Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (!compact && busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFF829BCD))
+        if (!compact && status.isNotBlank()) Text(status, color = Color(0xFF8C929C), fontSize = 12.sp)
         Button(onClick = {
             busy = true; status = "正在检查更新…"
             scope.launch {
@@ -163,11 +164,12 @@ fun AppUpdateButton() {
                 catch (e: Exception) { status = e.message ?: "更新失败，请重试" }
                 finally { busy = false }
             }
-        }, enabled = !busy, modifier = Modifier.fillMaxWidth().height(40.dp), shape = RoundedCornerShape(30.dp),
+        }, enabled = !busy, modifier = if (compact) Modifier.height(32.dp) else Modifier.fillMaxWidth().height(40.dp), shape = RoundedCornerShape(30.dp),
+            contentPadding = if (compact) PaddingValues(horizontal = 10.dp, vertical = 0.dp) else ButtonDefaults.ContentPadding,
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF829BCD), contentColor = Color.White)) {
-            Icon(Icons.Outlined.SystemUpdateAlt, null, Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(if (busy) "正在处理…" else "一键更新并升级", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Icon(Icons.Outlined.SystemUpdateAlt, null, Modifier.size(if (compact) 16.dp else 20.dp))
+            Spacer(Modifier.width(if (compact) 4.dp else 8.dp))
+            Text(if (compact) { if (busy) "更新中" else "更新" } else if (busy) "正在处理…" else "一键更新并升级", fontSize = if (compact) 12.sp else 17.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

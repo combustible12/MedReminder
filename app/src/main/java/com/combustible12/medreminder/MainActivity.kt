@@ -94,7 +94,7 @@ fun NotebookApp(app: MedApplication) {
     LaunchedEffect(state.reminders, permissionEpoch) { permissionProblem = app.scheduler.permissionProblem(); app.scheduler.scheduleAll() }
     BackHandler(detailId != null) { detailId = null }
     Scaffold(containerColor = Color.White, snackbarHost = { SnackbarHost(snack) },
-        topBar = { TopAppBar(title = { Text(if (detailId != null) "药品资料" else if (tab == 0) "用药便签" else "药品库", fontSize = 23.sp, fontWeight = FontWeight.SemiBold) }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
+        topBar = { TopAppBar(title = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(if (detailId != null) "药品资料" else if (tab == 0) "用药便签" else "药品库", fontSize = 23.sp, fontWeight = FontWeight.SemiBold); if (tab == 0 && detailId == null) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AppUpdateButton(compact = true) } } }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
             if (tab == 0 && detailId == null) {
                 IconButton(onClick = { order = OrderEditor("排列卡片", state.cards.map { it.id to it.name.ifBlank { "未命名卡片" } }, repo::reorderCards) }) { Icon(Icons.Outlined.SwapVert, "调整卡片顺序", tint = Quiet) }
                 IconButton(onClick = { permissionSheet = true }) { Icon(Icons.Outlined.NotificationsNone, "提醒权限", tint = Quiet) }
@@ -115,7 +115,6 @@ fun NotebookApp(app: MedApplication) {
                 })
             } else if (tab == 0) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    item(key = "app-update") { AppUpdateButton() }
                     if (state.cards.isEmpty()) item { Column(Modifier.fillMaxWidth().padding(top = 50.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("从一张空白卡片开始", color = Quiet); Spacer(Modifier.height(4.dp)); Text("点击右下角 ＋ 添加", color = Quiet, fontSize = 13.sp) } }
                     items(state.cards, key = { it.id }) { card ->
                         NoteCardView(card, state, { cardEditor = card }, { groupEditor = GroupEditor(card.id) }, { groupEditor = GroupEditor(card.id, it) }, { itemEditor = ItemEditor(it.id) }, { itemEditor = ItemEditor(it.groupId, it) }, { fullImage = it }, {
@@ -205,8 +204,8 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         if (med != null) {
                             Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(.45f)) {
-                                    Text(med.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-                                    if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet, modifier = Modifier.padding(top = 1.5.dp))
+                                    Text(med.name, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                                    if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, lineHeight = 18.sp, color = Quiet, modifier = Modifier.padding(top = 0.75.dp))
                                 }
                                 Box(Modifier.weight(.25f), contentAlignment = Alignment.Center) {
                                     Text(item.dose, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
