@@ -250,7 +250,7 @@ private fun MedicineDetail(med: Medicine, periods: List<UsePeriod>, image: (Stri
         items(periods, key = { it.id }) { p ->
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF5F6FA)).clickable { period(p) }.padding(16.dp)) {
                 Text(if (p.active) "当前使用" else "已停用", fontWeight = FontWeight.Medium)
-                if (p.start != null || p.end != null) Text("${p.start ?: "开始日期未填"}  至  ${if (p.active) "至今" else p.end ?: "停用日期未填"}", fontSize = 13.sp, color = Quiet)
+                if (p.start != null || p.end != null) Text(if (p.active) "${p.start ?: "开始日期未填"} 至今" else "${p.start ?: "开始日期未填"} 至 ${p.end ?: "停用日期未填"}", fontSize = 13.sp, color = Quiet)
             }
         }
         item { TextButton(onClick = { period(UsePeriod(medicineId = med.id)) }) { Text("＋ 添加使用记录") } }
@@ -374,7 +374,8 @@ private fun PeriodDialog(period: UsePeriod, dismiss: () -> Unit, save: (UsePerio
         try { validateDates(a, b); save(period.copy(start = a, end = b, active = active)) } catch (_: Exception) { error = "请用 YYYY-MM-DD 格式，停用日期不能早于开始日期" }
     }) {
         OutlinedTextField(start, { start = it; error = null }, label = { Text("开始日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("当前使用", Modifier.weight(1f)); Switch(active, { active = it }) }
+        if (period.id == 0L || period.active) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("当前使用", Modifier.weight(1f)); Switch(active, { active = it }) }
+        else Text("此段已停用。再次使用请添加新的使用记录，原有日期会保留。", fontSize = 12.sp, color = Quiet)
         if (!active) OutlinedTextField(end, { end = it; error = null }, label = { Text("停用日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
         if (period.id != 0L) TextButton(onClick = delete) { Text("删除这段记录", color = Color(0xFFB56F71)) }

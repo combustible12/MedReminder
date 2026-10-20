@@ -44,6 +44,10 @@ class DatabaseTest {
             assertEquals("2片", repo.dao.item(i2)!!.dose)
             val initial = repo.dao.medicinePeriods(med.id).single()
             repo.savePeriod(initial.copy(start = "2026-09-01", end = "2026-09-15", active = false))
+            var reopeningRejected = false
+            try { repo.savePeriod(initial.copy(active = true)) } catch (_: IllegalArgumentException) { reopeningRejected = true }
+            assertTrue("Reusing medicine must not erase a stopped period", reopeningRejected)
+            assertEquals("2026-09-15", repo.dao.medicinePeriods(med.id).single().end)
             repo.savePeriod(UsePeriod(medicineId = med.id, start = "2026-10-10"))
             assertEquals(2, repo.dao.medicinePeriods(med.id).size)
             assertEquals("2026-09-15", repo.dao.medicinePeriods(med.id).last().end)

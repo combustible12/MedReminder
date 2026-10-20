@@ -112,6 +112,8 @@ class Repository(val db: MedDatabase) {
     suspend fun savePeriod(value: UsePeriod) = db.withTransaction {
         validateDates(value.start, value.end)
         require(!value.active || value.end == null) { "当前使用记录不能有停用日期" }
+        val previous = if (value.id != 0L) dao.medicinePeriods(value.medicineId).firstOrNull { it.id == value.id } else null
+        require(previous == null || previous.active || !value.active) { "再次使用请添加新记录，原有日期会保留" }
         if (value.active) dao.medicinePeriods(value.medicineId).filter { it.active && it.id != value.id }.forEach { dao.updatePeriod(it.copy(active = false)) }
         if (value.id == 0L) dao.insertPeriod(value) else dao.updatePeriod(value)
     }
