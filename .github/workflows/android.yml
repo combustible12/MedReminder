@@ -70,7 +70,7 @@ jobs:
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
   publish:
-    if: github.ref == 'refs/heads/main' && hashFiles('release/ready.json') != ''
+    if: github.ref == 'refs/heads/main'
     needs: [build, acceptance]
     runs-on: ubuntu-latest
     permissions:
@@ -82,9 +82,14 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+      - name: Check signed deliverable
+        id: ready
+        run: echo "exists=$(test -f release/ready.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - name: Verify signed deliverable and source binding
+        if: steps.ready.outputs.exists == 'true'
         run: python3 ci/verify_release.py
       - name: Publish installable APK
+        if: steps.ready.outputs.exists == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
