@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: ${{ !contains(github.event.head_commit.message, '[signed-layout-release]') && !contains(github.event.head_commit.message, '[signed-release]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[acceptance-only]') && !contains(github.event.head_commit.message, '[signed-layout-release]') && !contains(github.event.head_commit.message, '[signed-release]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
             app/build/outputs/apk/release/*.apk
             signing-tools/**
   acceptance:
-    if: ${{ !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') && !contains(github.event.head_commit.message, '[signed-release]') }}
+    if: ${{ always() && (needs.build.result == 'success' || contains(github.event.head_commit.message, '[acceptance-only]')) && !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') && !contains(github.event.head_commit.message, '[signed-release]') }}
     needs: build
     runs-on: ubuntu-latest
     strategy:

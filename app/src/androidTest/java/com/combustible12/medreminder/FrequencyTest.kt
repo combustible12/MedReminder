@@ -29,16 +29,16 @@ class FrequencyTest {
         compose.onNodeWithText("每天次数（可不填）").performTextInput("2")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("1天2次").fetchSemanticsNodes().isNotEmpty() }
-        val dose = compose.onNodeWithText("1片").fetchSemanticsNode().boundsInRoot
-        val freq = compose.onNodeWithText("1天2次").fetchSemanticsNode().boundsInRoot
+        val dose = compose.onNodeWithText("1片", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val freq = compose.onNodeWithText("1天2次", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue(freq.top >= dose.bottom)
         assertTrue(kotlin.math.abs(freq.center.x - dose.center.x) < 2f)
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("1天2次").assertIsDisplayed()
         compose.onNodeWithText("药品库").performClick()
         compose.onNodeWithText("1天2次").assertIsDisplayed()
-        val nameBounds = compose.onNodeWithText("测试药品长名称 ⭐").fetchSemanticsNode().boundsInRoot
-        val label = compose.onNodeWithText("1天2次").fetchSemanticsNode().boundsInRoot
+        val nameBounds = compose.onNodeWithText("测试药品长名称 ⭐", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val label = compose.onNodeWithText("1天2次", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
         assertTrue(label.top >= nameBounds.bottom)
         assertTrue(kotlin.math.abs(label.center.x - root.center.x) < 3f)
