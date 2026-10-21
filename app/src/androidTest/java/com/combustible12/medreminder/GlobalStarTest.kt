@@ -44,7 +44,7 @@ class GlobalStarTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val name = "global-star-migration.db"
         context.deleteDatabase(name)
-        val schema = org.json.JSONObject(context.assets.open("legacy-v4.json").bufferedReader().readText()).getJSONObject("database")
+        val schema = org.json.JSONObject(InstrumentationRegistry.getInstrumentation().context.assets.open("legacy-v4.json").bufferedReader().readText()).getJSONObject("database")
         context.openOrCreateDatabase(name, 0, null).use { old ->
             val entities = schema.getJSONArray("entities")
             for (i in 0 until entities.length()) {
