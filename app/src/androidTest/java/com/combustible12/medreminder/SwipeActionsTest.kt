@@ -30,23 +30,23 @@ class SwipeActionsTest {
             compose.onAllNodesWithContentDescription("药品条目：$name").onFirst().performTouchInput { swipeLeft() }
         }
         swipe("药品乙")
-        compose.onNodeWithText("标星").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("标星").assertIsDisplayed().performClick()
         compose.waitUntil(10000) { runBlocking { repo.dao.item(b)!!.starred } }
         compose.onNodeWithText("药品乙 ⭐").assertIsDisplayed()
         runBlocking { assertEquals(listOf(a, -divider, b), repo.notebook.first().groupEntries(group).map { it.key }) }
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("药品乙 ⭐").assertIsDisplayed()
         swipe("药品乙")
-        compose.onNodeWithText("置顶").performClick()
+        compose.onNodeWithContentDescription("置顶").performClick()
         compose.waitUntil(10000) { runBlocking { repo.notebook.first().groupEntries(group).map { it.key } == listOf(b, a, -divider) } }
         swipe("药品乙")
-        compose.onNodeWithText("置底").performClick()
+        compose.onNodeWithContentDescription("置底").performClick()
         compose.waitUntil(10000) { runBlocking { repo.notebook.first().groupEntries(group).map { it.key } == listOf(a, -divider, b) } }
         swipe("药品乙")
-        compose.onNodeWithText("取消标星").performClick()
+        compose.onNodeWithContentDescription("取消标星").performClick()
         compose.waitUntil(10000) { runBlocking { !repo.dao.item(b)!!.starred } }
         swipe("药品乙")
-        compose.onNodeWithText("删除").performClick()
+        compose.onNodeWithContentDescription("删除").performClick()
         compose.onAllNodesWithText("删除").onLast().performClick()
         compose.waitUntil(10000) { runBlocking { repo.dao.item(b) == null } }
         runBlocking {
