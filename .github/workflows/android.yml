@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    if: ${{ !contains(github.event.head_commit.message, '[signed-layout-release]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[signed-layout-release]') && !contains(github.event.head_commit.message, '[signed-release]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
             app/build/outputs/apk/release/*.apk
             signing-tools/**
   acceptance:
-    if: ${{ !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') }}
+    if: ${{ !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') && !contains(github.event.head_commit.message, '[signed-release]') }}
     needs: build
     runs-on: ubuntu-latest
     strategy:
@@ -92,7 +92,7 @@ jobs:
             app/build/outputs/androidTest-results/
             qa-screenshots/
   publish:
-    if: ${{ always() && github.ref == 'refs/heads/main' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && contains(github.event.head_commit.message, '[signed-layout-release]'))) && (needs.acceptance.result == 'success' || needs.acceptance.result == 'skipped') }}
+    if: ${{ always() && github.ref == 'refs/heads/main' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && (contains(github.event.head_commit.message, '[signed-layout-release]') || contains(github.event.head_commit.message, '[signed-release]')))) && (needs.acceptance.result == 'success' || needs.acceptance.result == 'skipped') }}
     needs: [build, acceptance]
     runs-on: ubuntu-latest
     permissions:
@@ -131,7 +131,7 @@ jobs:
             adb install /tmp/MedReminder-old.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
-            adb install -r release/MedReminder-1.0.14.apk
+            adb install -r release/MedReminder-1.0.15.apk
             adb shell am start -W -n com.combustible12.medreminder/.MainActivity
             adb shell sleep 3
             adb shell pidof com.combustible12.medreminder
@@ -140,11 +140,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.0.14-build.${{ github.run_number }}"
+          TAG="v1.0.15-build.${{ github.run_number }}"
           python3 - "$TAG" <<'PYTHON'
           import hashlib, json, sys
           from pathlib import Path
-          apk = Path("release/MedReminder-1.0.14.apk")
-          Path("release/update.json").write_text(json.dumps({"name": "MedReminder 1.0.14", "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "url": "https://github.com/combustible12/MedReminder/releases/download/" + sys.argv[1] + "/" + apk.name}))
+          apk = Path("release/MedReminder-1.0.15.apk")
+          Path("release/update.json").write_text(json.dumps({"name": "MedReminder 1.0.15", "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "url": "https://github.com/combustible12/MedReminder/releases/download/" + sys.argv[1] + "/" + apk.name}))
           PYTHON
-          gh release create "$TAG" release/MedReminder-1.0.14.apk release/update.json --title "MedReminder 1.0.14" --notes-file docs/RELEASE_NOTES.md --latest --target "${{ github.sha }}"
+          gh release create "$TAG" release/MedReminder-1.0.15.apk release/update.json --title "MedReminder 1.0.15" --notes-file docs/RELEASE_NOTES.md --latest --target "${{ github.sha }}"

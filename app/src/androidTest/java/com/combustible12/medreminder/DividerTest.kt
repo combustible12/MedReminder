@@ -31,7 +31,7 @@ class DividerTest {
             old.execSQL("INSERT INTO items (id,groupId,medicineId,dose,position) VALUES (1,1,1,'2片',0)")
             old.version = 2
         }
-        var db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        var db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
         try {
             var repo = Repository(db)
             assertEquals("2片", repo.dao.item(1)!!.dose)
@@ -45,7 +45,7 @@ class DividerTest {
             repo.saveDivider(repo.dao.divider(divider)!!.copy(text = "间隔1小时"))
             assertTrue(runCatching { repo.reorderEntries(1, listOf(second, second, 1)) }.isFailure)
             db.close()
-            db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+            db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
             repo = Repository(db)
             val state = repo.notebook.first()
             assertEquals(listOf(second, -divider, 1L), state.groupEntries(1).map { it.key })

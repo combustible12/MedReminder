@@ -14,7 +14,13 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlin.math.roundToInt
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -135,7 +141,14 @@ fun NotebookApp(app: MedApplication) {
                             confirm = Confirmation("删除卡片？", "删除卡片内的大类和首页安排，并取消提醒。药品库和使用历史会保留。") {
                                 ReminderScheduler.mutex.withLock { state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.dao.deleteCard(card.id) }
                             }
-                        }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it }, { group, keys -> perform { repo.reorderEntries(group.id, keys) } })
+                        }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it }, { group, keys -> perform { repo.reorderEntries(group.id, keys) } }, { item, action ->
+                            when (action) {
+                                "delete" -> confirm = Confirmation("删除便签条目？", "只移除此处安排，药品库和使用历史会保留。") { repo.dao.deleteItem(item.id); app.scheduler.cancel(item.groupId); app.scheduler.schedule(item.groupId) }
+                                "top" -> perform { repo.moveItemToEdge(item.id, true) }
+                                "bottom" -> perform { repo.moveItemToEdge(item.id, false) }
+                                "star" -> perform { repo.toggleItemStar(item.id) }
+                            }
+                        })
                     }
                 }
             } else { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
@@ -174,7 +187,7 @@ fun NotebookApp(app: MedApplication) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?, addDivider: (NoteGroup) -> Unit, editDivider: (NoteDivider) -> Unit, saveOrder: (NoteGroup, List<Long>) -> Unit) {
+private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addGroup: () -> Unit, editGroup: (NoteGroup) -> Unit, addItem: (NoteGroup) -> Unit, editItem: (NoteItem) -> Unit, image: (String) -> Unit, delete: () -> Unit, reorder: () -> Unit, reorderItems: (NoteGroup) -> Unit, permissionProblem: String?, addDivider: (NoteGroup) -> Unit, editDivider: (NoteDivider) -> Unit, saveOrder: (NoteGroup, List<Long>) -> Unit, itemAction: (NoteItem, String) -> Unit) {
     val groups = state.groups.filter { it.cardId == card.id }
     val color = Colors[card.color.mod(Colors.size)]
     val accent = Accents[card.color.mod(Colors.size)]
@@ -229,9 +242,10 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         val item = requireNotNull(entry.item)
                         val med = state.medicines.firstOrNull { it.id == item.medicineId }
                         if (med != null) {
+                            SwipeMedicineActions(item.id, item.starred, med.name, androidx.compose.ui.graphics.lerp(color, Color.White, .85f), { itemAction(item, it) }) {
                             Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(.45f)) {
-                                    Text(med.name, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                                    Text(med.name + if (item.starred) " ⭐" else "", fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                     if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, lineHeight = 18.sp, color = Quiet, modifier = Modifier.padding(top = 0.75.dp))
                                 }
                                 Box(Modifier.weight(.25f), contentAlignment = Alignment.Center) {
@@ -240,6 +254,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                 Box(Modifier.weight(.30f), contentAlignment = Alignment.CenterEnd) {
                                     med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
                                 }
+                            }
                             }
                             Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else 0.5.dp))
                         }
@@ -495,5 +510,31 @@ private fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conten
                 }) { content(index, id) }
             }
         }
+    }
+}
+
+
+/** Horizontal motion reveals actions; vertical scrolling and long-press sorting retain their gestures. */
+@Composable private fun SwipeMedicineActions(id: Long, starred: Boolean, name: String, background: Color, action: (String) -> Unit, content: @Composable () -> Unit) {
+    val density = LocalDensity.current
+    val reveal = with(density) { 248.dp.toPx() }
+    var offset by remember(id) { mutableFloatStateOf(0f) }
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).semantics { contentDescription = "药品条目：$name" }) {
+        if (offset < 0f) Row(Modifier.align(Alignment.CenterEnd).width(248.dp).heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            listOf("top" to "置顶", "bottom" to "置底", "star" to if (starred) "取消标星" else "标星", "delete" to "删除").forEach { (key, label) ->
+                TextButton(onClick = { offset = 0f; action(key) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)) {
+                    Text(label, fontSize = 12.sp, color = if (key == "delete") Color(0xFFB56F71) else Ink)
+                }
+            }
+        }
+        Box(Modifier.offset { IntOffset(offset.roundToInt(), 0) }.fillMaxWidth()
+            .background(background)
+            .pointerInput(id, reveal) {
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, amount -> change.consume(); offset = (offset + amount).coerceIn(-reveal, 0f) },
+                    onDragEnd = { offset = if (offset < -reveal / 3f) -reveal else 0f },
+                    onDragCancel = { offset = 0f }
+                )
+            }) { content() }
     }
 }

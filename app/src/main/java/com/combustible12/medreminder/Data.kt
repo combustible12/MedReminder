@@ -17,7 +17,7 @@ data class NoteGroup(@PrimaryKey(autoGenerate = true) val id: Long = 0, val card
 @Entity(tableName = "medicines", indices = [Index(value = ["identity"], unique = true)])
 data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification), @ColumnInfo(defaultValue = "''") val imagesJson: String = "")
 @Entity(tableName = "items", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = Medicine::class, parentColumns = ["id"], childColumns = ["medicineId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId"), Index("medicineId")])
-data class NoteItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val groupId: Long, val medicineId: Long, val dose: String, val position: Int = 0)
+data class NoteItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val groupId: Long, val medicineId: Long, val dose: String, val position: Int = 0, @ColumnInfo(defaultValue = "0") val starred: Boolean = false)
 @Entity(tableName = "dividers", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId")])
 data class NoteDivider(@PrimaryKey(autoGenerate = true) val id: Long = 0, val groupId: Long, val text: String = "1小时", val position: Int = 0)
 
@@ -90,7 +90,7 @@ interface MedDao {
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM (SELECT position FROM items WHERE groupId=:groupId UNION ALL SELECT position FROM dividers WHERE groupId=:groupId)") suspend fun nextItem(groupId: Long): Int
 }
 
-@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class, NoteDivider::class], version = 3, exportSchema = true)
+@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class, NoteDivider::class], version = 4, exportSchema = true)
 abstract class MedDatabase : RoomDatabase() {
     abstract fun dao(): MedDao
 }
@@ -105,6 +105,12 @@ val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         db.execSQL("CREATE TABLE IF NOT EXISTS dividers (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, groupId INTEGER NOT NULL, text TEXT NOT NULL, position INTEGER NOT NULL, FOREIGN KEY(groupId) REFERENCES groups(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_dividers_groupId ON dividers(groupId)")
+    }
+}
+
+val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE items ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
     }
 }
 
@@ -172,6 +178,18 @@ class Repository(val db: MedDatabase) {
             else dao.divider(-key)?.let { dao.updateDivider(it.copy(position = position)) }
         }
     }
+    suspend fun toggleItemStar(id: Long) = db.withTransaction {
+        val item = requireNotNull(dao.item(id)) { "条目已被删除" }
+        dao.updateItem(item.copy(starred = !item.starred))
+    }
+    suspend fun moveItemToEdge(id: Long, top: Boolean) = db.withTransaction {
+        val item = requireNotNull(dao.item(id)) { "条目已被删除" }
+        val entries = (dao.groupItems(item.groupId).map { NotebookEntry(item = it) } +
+            dao.dividers().first().filter { it.groupId == item.groupId }.map { NotebookEntry(divider = it) })
+            .sortedWith(compareBy<NotebookEntry> { it.position }.thenBy { it.key }).map { it.key }
+        val rest = entries.filterNot { it == id }
+        reorderEntries(item.groupId, if (top) listOf(id) + rest else rest + id)
+    }
     suspend fun reorderCards(ids: List<Long>) = db.withTransaction { ids.forEachIndexed { p, id -> dao.card(id)?.let { dao.updateCard(it.copy(position = p)) } } }
     suspend fun reorderGroups(ids: List<Long>) = db.withTransaction { ids.forEachIndexed { p, id -> dao.group(id)?.let { dao.updateGroup(it.copy(position = p)) } } }
     suspend fun reorderItems(ids: List<Long>) = db.withTransaction { ids.forEachIndexed { p, id -> dao.item(id)?.let { dao.updateItem(it.copy(position = p)) } } }
@@ -198,7 +216,7 @@ class ImageStore(private val context: Context) {
 
 class MedApplication : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build() }
+    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build() }
     val repository by lazy { Repository(database) }
     val scheduler by lazy { ReminderScheduler(this, database) }
     override fun onCreate() { super.onCreate(); scheduler.createChannel() }
