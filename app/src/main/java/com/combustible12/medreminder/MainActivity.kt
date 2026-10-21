@@ -464,7 +464,7 @@ private fun DividerDialog(divider: NoteDivider, dismiss: () -> Unit, save: (Stri
 
 /** Stable parent coordinates keep the finger attached while keyed children move. */
 @Composable
-private fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, content: @Composable (Int, Long) -> Unit) {
+internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, content: @Composable (Int, Long) -> Unit) {
     var ordered by remember { mutableStateOf(source) }
     var dragging by remember { mutableStateOf<Long?>(null) }
     var fingerY by remember { mutableFloatStateOf(0f) }
@@ -472,18 +472,27 @@ private fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conten
     val bounds = remember { mutableStateMapOf<Long, Pair<Float, Float>>() }
     val latestSave by rememberUpdatedState(save)
     val latestSource by rememberUpdatedState(source)
-    LaunchedEffect(source) { if (dragging == null) ordered = source }
+    // Source membership must be honored in the current composition, before effects run.
+    // A deleted key must never reach content(), whose model already excludes it.
+    val sameMembers = ordered.size == source.size && ordered.toSet() == source.toSet()
+    val visibleOrder = if (dragging != null && sameMembers) ordered else source
+    LaunchedEffect(source) {
+        ordered = source
+        dragging = null
+        bounds.keys.retainAll(source.toSet())
+    }
     Column(Modifier.fillMaxWidth().pointerInput(Unit) {
         detectDragGesturesAfterLongPress(
             onDragStart = { point ->
-                val id = ordered.firstOrNull { id -> bounds[id]?.let { point.y >= it.first && point.y < it.second } == true }
+                ordered = latestSource
+                val id = latestSource.firstOrNull { id -> bounds[id]?.let { point.y >= it.first && point.y < it.second } == true }
                 dragging = id
                 fingerY = point.y
                 grabOffset = point.y - (bounds[id]?.first ?: point.y)
             },
             onDrag = { change, amount ->
                 val id = dragging
-                if (id != null) {
+                if (id != null && ordered.size == latestSource.size && ordered.toSet() == latestSource.toSet()) {
                     change.consume()
                     fingerY += amount.y
                     val target = ordered.firstOrNull { other -> other != id && bounds[other]?.let { fingerY >= it.first && fingerY < it.second } == true }
@@ -493,13 +502,13 @@ private fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conten
                 }
             },
             onDragEnd = {
-                if (dragging != null && ordered != latestSource) latestSave(ordered)
+                if (dragging != null && ordered != latestSource && ordered.size == latestSource.size && ordered.toSet() == latestSource.toSet()) latestSave(ordered)
                 dragging = null
             },
             onDragCancel = { dragging = null; ordered = latestSource }
         )
     }) {
-        ordered.forEachIndexed { index, id ->
+        visibleOrder.forEachIndexed { index, id ->
             key(id) {
                 Box(Modifier.fillMaxWidth().onGloballyPositioned { c ->
                     val top = c.positionInParent().y
