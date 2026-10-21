@@ -165,7 +165,7 @@ fun NotebookApp(app: MedApplication) {
     dividerEditor?.let { divider -> DividerDialog(divider, { dividerEditor = null }, { text -> perform { repo.saveDivider(divider.copy(text = text)); dividerEditor = null } }, {
         confirm = Confirmation("删除分隔条？", "只删除这条分隔线，药品安排保留。") { repo.dao.deleteDivider(divider.id); dividerEditor = null }
     }) }
-    itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, images -> perform { repo.saveItem(editor.groupId, editor.item?.id, selected, name, spec, dose, images.firstOrNull(), encodePhotos(images), editSelected = true); state.medicines.firstOrNull { it.id == selected }?.photos()?.forEach { ImageStore(app).removeIfUnused(it, app.database) }; app.scheduler.schedule(editor.groupId); itemEditor = null } }, {
+    itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, images, frequency -> perform { repo.saveItem(editor.groupId, editor.item?.id, selected, name, spec, dose, images.firstOrNull(), encodePhotos(images), editSelected = true, dailyFrequency = frequency); state.medicines.firstOrNull { it.id == selected }?.photos()?.forEach { ImageStore(app).removeIfUnused(it, app.database) }; app.scheduler.schedule(editor.groupId); itemEditor = null } }, {
         val i = editor.item ?: return@ItemDialog
         confirm = Confirmation("删除首页条目？", "只移除此处安排，药品库和使用历史会保留。") { repo.dao.deleteItem(i.id); app.scheduler.cancel(i.groupId); app.scheduler.schedule(i.groupId); itemEditor = null }
     }) }
@@ -251,8 +251,9 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                     Text(med.name + if (med.starred) " ⭐" else "", fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                     if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, lineHeight = 18.sp, color = Quiet, modifier = Modifier.padding(top = 0.75.dp))
                                 }
-                                Box(Modifier.weight(.25f), contentAlignment = Alignment.Center) {
+                                Column(Modifier.weight(.25f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(item.dose, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
+                                    if (med.dailyFrequency.isNotBlank()) Text(med.frequencyLabel(), fontSize = 12.sp, color = Quiet, modifier = Modifier.padding(top = 4.dp))
                                 }
                                 Box(Modifier.weight(.30f), contentAlignment = Alignment.CenterEnd) {
                                     med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
@@ -289,13 +290,16 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.5.dp), contentPadding = PaddingValues(bottom = 10.dp)) {
             if (meds.isEmpty()) item { Text("暂无药品记录", color = Quiet, modifier = Modifier.padding(vertical = 20.dp)) }
             items(meds, key = { it.id }) { med ->
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
                         Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
                         if (med.specification.isNotBlank()) Text(med.specification, color = Quiet, fontSize = 12.sp)
                         Text(if (state.periods.any { it.medicineId == med.id && it.active }) "当前使用" else "已停用", color = Quiet, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     }
                     med.image?.let { path -> AsyncImage(File(path), "查看图片", Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
+                }
+                if (med.dailyFrequency.isNotBlank()) Text(med.frequencyLabel(), color = Quiet, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
                 }
             }
         }
@@ -306,6 +310,7 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
 private fun MedicineDetail(med: Medicine, periods: List<UsePeriod>, image: (String) -> Unit, edit: () -> Unit, period: (UsePeriod) -> Unit, delete: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         item { Text(med.name + if (med.starred) " ⭐" else "", fontSize = 25.sp, fontWeight = FontWeight.Bold); if (med.specification.isNotBlank()) Text(med.specification, color = Quiet); if (med.defaultDose.isNotBlank()) Text("记录用量：${med.defaultDose}", fontSize = 13.sp, color = Quiet) }
+        if (med.dailyFrequency.isNotBlank()) item { Text(med.frequencyLabel(), color = Quiet, fontSize = 13.sp) }
         if (med.photos().isNotEmpty()) item { PhotoStrip(med.photos(), image) }
         item { TextButton(onClick = edit) { Text("编辑药品资料") } }
         item { Text("使用记录", fontWeight = FontWeight.SemiBold); Text("日期可留空，重新使用时添加新记录", fontSize = 12.sp, color = Quiet) }
@@ -358,13 +363,14 @@ private fun GroupDialog(editor: GroupEditor, existing: Reminder?, dismiss: () ->
 }
 
 @Composable
-private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication, dismiss: () -> Unit, save: (Long?, String, String, String, List<String>) -> Unit, delete: () -> Unit) {
+private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication, dismiss: () -> Unit, save: (Long?, String, String, String, List<String>, String) -> Unit, delete: () -> Unit) {
     val original = state.medicines.firstOrNull { it.id == editor.item?.medicineId }
     var selectedId by remember { mutableStateOf(original?.id) }
     val selected = state.medicines.firstOrNull { it.id == selectedId }
     var name by remember { mutableStateOf(original?.name ?: "") }
     var spec by remember { mutableStateOf(original?.specification ?: "") }
     var dose by remember { mutableStateOf(editor.item?.dose ?: "") }
+    var frequency by remember { mutableStateOf(original?.dailyFrequency ?: "") }
     var images by remember { mutableStateOf(original?.photos() ?: emptyList()) }
     var chooser by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -376,13 +382,14 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
         if (uris.isNotEmpty()) scope.launch { loading = true; try { for (uri in uris) { val path = ImageStore(app).import(uri).also { imported.add(it) }; images = images + path } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } }
     }
     EditorDialog(if (editor.item == null) "添加项目" else "编辑项目", dismiss, {
-        if (loading) error = "正在保存图片" else if (name.isBlank()) error = "请填写名称" else save(selectedId, name, spec, dose, images)
+        if (loading) error = "正在保存图片" else if (name.isBlank()) error = "请填写名称" else save(selectedId, name, spec, dose, images, frequency)
     }) {
-        Row { TextButton(onClick = { chooser = true }) { Text("从药品库选择") }; if (selectedId != null) TextButton(onClick = { selectedId = null; name = ""; spec = ""; images = emptyList() }) { Text("新建药品") } }
+        Row { TextButton(onClick = { chooser = true }) { Text("从药品库选择") }; if (selectedId != null) TextButton(onClick = { selectedId = null; name = ""; spec = ""; images = emptyList(); frequency = "" }) { Text("新建药品") } }
         SoftTextField(name, { name = it; error = null }, label = { Text("药品或护理名称") }, modifier = Modifier.fillMaxWidth())
         SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, placeholder = { Text("如 20mg") }, modifier = Modifier.fillMaxWidth())
         if (selected != null && state.items.count { it.medicineId == selected.id } > 1) Text("药名、规格和图片会同步到引用此药品的条目，用量单独保存。", color = Quiet, fontSize = 12.sp)
         SoftTextField(dose, { dose = it }, label = { Text("每次用量") }, placeholder = { Text("如 1片、2粒、1次") }, modifier = Modifier.fillMaxWidth())
+        FrequencyField(frequency, { frequency = it })
         PhotoEditor(images, loading, true,
             { launcher.launch("image/*") }, { path -> images = images - path })
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
@@ -391,7 +398,7 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
     if (chooser) {
         var query by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { chooser = false }, title = { Text("选择药品") }, text = { Column { SoftTextField(query, { query = it }, label = { Text("搜索名称") }); LazyColumn(Modifier.heightIn(max = 300.dp)) {
-            items(state.medicines.filter { it.name.contains(query, ignoreCase = true) }, key = { it.id }) { med -> TextButton(onClick = { selectedId = med.id; name = med.name; spec = med.specification; images = med.photos(); dose = med.defaultDose; chooser = false }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(med.name + if (med.starred) " ⭐" else ""); if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet) } } }
+            items(state.medicines.filter { it.name.contains(query, ignoreCase = true) }, key = { it.id }) { med -> TextButton(onClick = { selectedId = med.id; name = med.name; spec = med.specification; images = med.photos(); dose = med.defaultDose; frequency = med.dailyFrequency; chooser = false }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(med.name + if (med.starred) " ⭐" else ""); if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet) } } }
         } } }, confirmButton = { TextButton(onClick = { chooser = false }) { Text("取消") } })
     }
 }
@@ -401,6 +408,7 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
     var name by remember { mutableStateOf(med.name) }
     var spec by remember { mutableStateOf(med.specification) }
     var dose by remember { mutableStateOf(med.defaultDose) }
+    var frequency by remember { mutableStateOf(med.dailyFrequency) }
     var images by remember { mutableStateOf(med.photos()) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -408,11 +416,12 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
     val imported = remember { mutableListOf<String>() }
     DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (uris.isNotEmpty()) scope.launch { loading = true; try { for (uri in uris) { val path = ImageStore(app).import(uri).also { imported.add(it) }; images = images + path } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
-    EditorDialog("编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
+    EditorDialog("编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, dailyFrequency = frequency, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
         Text("名称、规格和图片会同步用于引用此药品的首页条目。各条目的用量保持独立。", fontSize = 12.sp, color = Quiet)
         SoftTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())
         SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, modifier = Modifier.fillMaxWidth())
         SoftTextField(dose, { dose = it }, label = { Text("复用时带出的用量（可不填）") }, modifier = Modifier.fillMaxWidth())
+        FrequencyField(frequency, { frequency = it })
         PhotoEditor(images, loading, true, { launcher.launch("image/*") }, { path -> images = images - path })
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     }
@@ -565,4 +574,9 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
         }
         Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth().background(background)) { content() }
     }
+}
+
+@Composable
+private fun FrequencyField(value: String, change: (String) -> Unit) {
+    SoftTextField(value, { change(it.filter { ch -> ch in '0'..'9' }) }, label = { Text("每天次数（可不填）") }, placeholder = { Text("如 1、2、3") }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number), modifier = Modifier.fillMaxWidth())
 }

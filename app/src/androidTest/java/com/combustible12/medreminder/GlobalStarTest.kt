@@ -12,7 +12,7 @@ class GlobalStarTest {
         val name = "global-star-test.db"
         context.deleteDatabase(name)
         fun open() = Room.databaseBuilder(context, MedDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build()
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build()
         var db = open()
         try {
             var repo = Repository(db)
@@ -60,7 +60,7 @@ class GlobalStarTest {
             old.execSQL("INSERT INTO items VALUES(2,1,1,'2片',1,0)")
             old.version = 4
         }
-        val db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_4_5).build()
+        val db = Room.databaseBuilder(context, MedDatabase::class.java, name).addMigrations(MIGRATION_4_5, MIGRATION_5_6).build()
         try {
             assertTrue(db.dao().medicine(1)!!.starred)
             assertTrue(db.dao().item(2)!!.starred)

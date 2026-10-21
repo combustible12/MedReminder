@@ -15,7 +15,7 @@ data class NoteCard(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name:
 @Entity(tableName = "groups", foreignKeys = [ForeignKey(entity = NoteCard::class, parentColumns = ["id"], childColumns = ["cardId"], onDelete = ForeignKey.CASCADE)], indices = [Index("cardId")])
 data class NoteGroup(@PrimaryKey(autoGenerate = true) val id: Long = 0, val cardId: Long, val name: String, val position: Int = 0)
 @Entity(tableName = "medicines", indices = [Index(value = ["identity"], unique = true)])
-data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification), @ColumnInfo(defaultValue = "''") val imagesJson: String = "", @ColumnInfo(defaultValue = "0") val starred: Boolean = false)
+data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification), @ColumnInfo(defaultValue = "''") val imagesJson: String = "", @ColumnInfo(defaultValue = "0") val starred: Boolean = false, @ColumnInfo(defaultValue = "''") val dailyFrequency: String = "")
 @Entity(tableName = "items", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = Medicine::class, parentColumns = ["id"], childColumns = ["medicineId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId"), Index("medicineId")])
 data class NoteItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val groupId: Long, val medicineId: Long, val dose: String, val position: Int = 0, @ColumnInfo(defaultValue = "0") val starred: Boolean = false)
 @Entity(tableName = "dividers", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId")])
@@ -91,7 +91,7 @@ interface MedDao {
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM (SELECT position FROM items WHERE groupId=:groupId UNION ALL SELECT position FROM dividers WHERE groupId=:groupId)") suspend fun nextItem(groupId: Long): Int
 }
 
-@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class, NoteDivider::class], version = 5, exportSchema = true)
+@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class, NoteDivider::class], version = 6, exportSchema = true)
 abstract class MedDatabase : RoomDatabase() {
     abstract fun dao(): MedDao
 }
@@ -123,6 +123,20 @@ val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE medicines ADD COLUMN dailyFrequency TEXT NOT NULL DEFAULT ''")
+    }
+}
+
+fun normalizeDailyFrequency(value: String): String {
+    if (value.isBlank()) return ""
+    val count = value.trim().toIntOrNull()
+    require(count != null && count > 0) { "每天次数请填写大于0的整数" }
+    return count.toString()
+}
+fun Medicine.frequencyLabel(): String = if (dailyFrequency.isBlank()) "" else "1天${dailyFrequency}次"
+
 class Repository(val db: MedDatabase) {
     val dao = db.dao()
     val notebook = combine(dao.cards(), dao.groups(), dao.items(), dao.medicines(), dao.periods()) { c, g, i, m, p -> Notebook(c, g, i, m, p) }.combine(dao.reminders()) { n, r -> n.copy(reminders = r) }.combine(dao.dividers()) { n, d -> n.copy(dividers = d) }
@@ -133,7 +147,7 @@ class Repository(val db: MedDatabase) {
         dao.putReminder(reminder.copy(groupId = id, enabled = reminder.enabled && reminder.hour != null && reminder.minute != null))
         id
     }
-    suspend fun saveItem(groupId: Long, itemId: Long?, selectedId: Long?, name: String, spec: String, dose: String, image: String?, imagesJson: String = "", editSelected: Boolean = false): Long = db.withTransaction {
+    suspend fun saveItem(groupId: Long, itemId: Long?, selectedId: Long?, name: String, spec: String, dose: String, image: String?, imagesJson: String = "", editSelected: Boolean = false, dailyFrequency: String? = null): Long = db.withTransaction {
         require(name.isNotBlank()) { "请填写名称" }
         val old = itemId?.let { dao.item(it) }
         if (itemId != null) requireNotNull(old) { "条目已被删除" }
@@ -150,6 +164,10 @@ class Repository(val db: MedDatabase) {
             dao.updateMedicine(med.copy(image = photos.firstOrNull(), imagesJson = encodePhotos(photos)))
         }
         val medId = med?.id ?: dao.insertMedicine(Medicine(name = name.trim(), specification = spec.trim(), defaultDose = dose.trim(), image = image, imagesJson = imagesJson))
+        if (dailyFrequency != null) {
+            val current = requireNotNull(dao.medicine(medId))
+            dao.updateMedicine(current.copy(dailyFrequency = normalizeDailyFrequency(dailyFrequency)))
+        }
         if (dao.medicinePeriods(medId).none { it.active }) dao.insertPeriod(UsePeriod(medicineId = medId))
         if (old == null) dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId), starred = dao.medicine(medId)!!.starred))
         else { dao.updateItem(old.copy(medicineId = medId, dose = dose.trim(), starred = dao.medicine(medId)!!.starred)); old.id }
@@ -159,7 +177,7 @@ class Repository(val db: MedDatabase) {
         val identity = identityOf(value.name, value.specification)
         val existing = dao.findMedicine(identity)
         require(existing == null || existing.id == value.id) { "相同名称和规格的药品已存在，请使用已有档案" }
-        dao.updateMedicine(value.copy(name = value.name.trim(), specification = value.specification.trim(), identity = identity))
+        dao.updateMedicine(value.copy(name = value.name.trim(), specification = value.specification.trim(), identity = identity, dailyFrequency = normalizeDailyFrequency(value.dailyFrequency)))
     }
     suspend fun savePeriod(value: UsePeriod) = db.withTransaction {
         validateDates(value.start, value.end)
@@ -228,7 +246,7 @@ class ImageStore(private val context: Context) {
 
 class MedApplication : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build() }
+    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build() }
     val repository by lazy { Repository(database) }
     val scheduler by lazy { ReminderScheduler(this, database) }
     override fun onCreate() { super.onCreate(); scheduler.createChannel() }

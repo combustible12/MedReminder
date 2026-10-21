@@ -34,10 +34,11 @@ internal fun SoftTextField(
     placeholder: (@Composable () -> Unit)? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
     singleLine: Boolean = false, shape: Shape = RoundedCornerShape(16.dp),
-    isError: Boolean = false
+    isError: Boolean = false,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default
 ) {
     TextField(value, onValueChange, modifier, label = label, placeholder = placeholder,
-        leadingIcon = leadingIcon, singleLine = singleLine, shape = shape, isError = isError,
+        leadingIcon = leadingIcon, singleLine = singleLine, shape = shape, isError = isError, keyboardOptions = keyboardOptions,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.White, unfocusedContainerColor = Color.White,
             disabledContainerColor = Color.White, errorContainerColor = Color.White,

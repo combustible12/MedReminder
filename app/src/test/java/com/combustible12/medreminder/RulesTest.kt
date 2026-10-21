@@ -5,6 +5,14 @@ import org.junit.Test
 import java.time.ZonedDateTime
 
 class RulesTest {
+    @Test fun optionalFrequencyUsesDigitsAndRejectsInvalidCounts() {
+        assertEquals("", normalizeDailyFrequency(""))
+        assertEquals("2", normalizeDailyFrequency("02"))
+        assertEquals("1天3次", Medicine(name = "药", dailyFrequency = "3").frequencyLabel())
+        assertEquals("", Medicine(name = "药").frequencyLabel())
+        listOf("0", "-1", "1.5", "两次").forEach { assertTrue(runCatching { normalizeDailyFrequency(it) }.isFailure) }
+    }
+
     @Test fun blankTimeDoesNotDisplay() { assertNull(Reminder(1).time()); assertEquals("08:05", Reminder(1, 8, 5).time()) }
     @Test fun identityUsesNameAndSpecificationOnly() { assertEquals(identityOf(" 药品 A ", "20mg"), identityOf("药品 A", "20mg ")); assertNotEquals(identityOf("药品 A", "20mg"), identityOf("药品 A", "40mg")) }
     @Test fun nextDailyAlarmUsesTomorrowWhenTimePassed() {
