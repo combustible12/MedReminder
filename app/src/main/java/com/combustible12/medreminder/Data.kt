@@ -15,7 +15,7 @@ data class NoteCard(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name:
 @Entity(tableName = "groups", foreignKeys = [ForeignKey(entity = NoteCard::class, parentColumns = ["id"], childColumns = ["cardId"], onDelete = ForeignKey.CASCADE)], indices = [Index("cardId")])
 data class NoteGroup(@PrimaryKey(autoGenerate = true) val id: Long = 0, val cardId: Long, val name: String, val position: Int = 0)
 @Entity(tableName = "medicines", indices = [Index(value = ["identity"], unique = true)])
-data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification), @ColumnInfo(defaultValue = "''") val imagesJson: String = "")
+data class Medicine(@PrimaryKey(autoGenerate = true) val id: Long = 0, val name: String, val specification: String = "", val image: String? = null, val defaultDose: String = "", val identity: String = identityOf(name, specification), @ColumnInfo(defaultValue = "''") val imagesJson: String = "", @ColumnInfo(defaultValue = "0") val starred: Boolean = false)
 @Entity(tableName = "items", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE), ForeignKey(entity = Medicine::class, parentColumns = ["id"], childColumns = ["medicineId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId"), Index("medicineId")])
 data class NoteItem(@PrimaryKey(autoGenerate = true) val id: Long = 0, val groupId: Long, val medicineId: Long, val dose: String, val position: Int = 0, @ColumnInfo(defaultValue = "0") val starred: Boolean = false)
 @Entity(tableName = "dividers", foreignKeys = [ForeignKey(entity = NoteGroup::class, parentColumns = ["id"], childColumns = ["groupId"], onDelete = ForeignKey.CASCADE)], indices = [Index("groupId")])
@@ -80,6 +80,7 @@ interface MedDao {
     @Update suspend fun updateMedicine(value: Medicine)
     @Update suspend fun updateItem(value: NoteItem)
     @Update suspend fun updatePeriod(value: UsePeriod)
+    @Query("UPDATE items SET starred=:starred WHERE medicineId=:medicineId") suspend fun setItemStars(medicineId: Long, starred: Boolean)
     @Query("DELETE FROM cards WHERE id=:id") suspend fun deleteCard(id: Long)
     @Query("DELETE FROM groups WHERE id=:id") suspend fun deleteGroup(id: Long)
     @Query("DELETE FROM items WHERE id=:id") suspend fun deleteItem(id: Long)
@@ -90,7 +91,7 @@ interface MedDao {
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM (SELECT position FROM items WHERE groupId=:groupId UNION ALL SELECT position FROM dividers WHERE groupId=:groupId)") suspend fun nextItem(groupId: Long): Int
 }
 
-@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class, NoteDivider::class], version = 4, exportSchema = true)
+@Database(entities = [NoteCard::class, NoteGroup::class, Medicine::class, NoteItem::class, UsePeriod::class, Reminder::class, NoteDivider::class], version = 5, exportSchema = true)
 abstract class MedDatabase : RoomDatabase() {
     abstract fun dao(): MedDao
 }
@@ -111,6 +112,14 @@ val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
 val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE items ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
+val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE medicines ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE medicines SET starred = 1 WHERE id IN (SELECT medicineId FROM items WHERE starred = 1)")
+        db.execSQL("UPDATE items SET starred = (SELECT starred FROM medicines WHERE medicines.id = items.medicineId)")
     }
 }
 
@@ -142,8 +151,8 @@ class Repository(val db: MedDatabase) {
         }
         val medId = med?.id ?: dao.insertMedicine(Medicine(name = name.trim(), specification = spec.trim(), defaultDose = dose.trim(), image = image, imagesJson = imagesJson))
         if (dao.medicinePeriods(medId).none { it.active }) dao.insertPeriod(UsePeriod(medicineId = medId))
-        if (old == null) dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId)))
-        else { dao.updateItem(old.copy(medicineId = medId, dose = dose.trim())); old.id }
+        if (old == null) dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId), starred = dao.medicine(medId)!!.starred))
+        else { dao.updateItem(old.copy(medicineId = medId, dose = dose.trim(), starred = dao.medicine(medId)!!.starred)); old.id }
     }
     suspend fun updateMedicine(value: Medicine) = db.withTransaction {
         require(value.name.isNotBlank()) { "请填写名称" }
@@ -180,7 +189,10 @@ class Repository(val db: MedDatabase) {
     }
     suspend fun toggleItemStar(id: Long) = db.withTransaction {
         val item = requireNotNull(dao.item(id)) { "条目已被删除" }
-        dao.updateItem(item.copy(starred = !item.starred))
+        val medicine = requireNotNull(dao.medicine(item.medicineId))
+        val starred = !medicine.starred
+        dao.updateMedicine(medicine.copy(starred = starred))
+        dao.setItemStars(medicine.id, starred)
     }
     suspend fun moveItemToEdge(id: Long, top: Boolean) = db.withTransaction {
         val item = requireNotNull(dao.item(id)) { "条目已被删除" }
@@ -216,7 +228,7 @@ class ImageStore(private val context: Context) {
 
 class MedApplication : Application() {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build() }
+    val database by lazy { Room.databaseBuilder(this, MedDatabase::class.java, "medreminder.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build() }
     val repository by lazy { Repository(database) }
     val scheduler by lazy { ReminderScheduler(this, database) }
     override fun onCreate() { super.onCreate(); scheduler.createChannel() }

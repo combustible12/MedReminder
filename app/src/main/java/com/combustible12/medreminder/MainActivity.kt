@@ -245,10 +245,10 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         val item = requireNotNull(entry.item)
                         val med = state.medicines.firstOrNull { it.id == item.medicineId }
                         if (med != null) {
-                            SwipeMedicineActions(item.id, item.starred, med.name, androidx.compose.ui.graphics.lerp(color, Color.White, .85f), { itemAction(item, it) }) {
+                            SwipeMedicineActions(item.id, med.starred, med.name, androidx.compose.ui.graphics.lerp(color, Color.White, .85f), { itemAction(item, it) }) {
                             Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(.45f)) {
-                                    Text(med.name + if (item.starred) " ⭐" else "", fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+                                    Text(med.name + if (med.starred) " ⭐" else "", fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                     if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, lineHeight = 18.sp, color = Quiet, modifier = Modifier.padding(top = 0.75.dp))
                                 }
                                 Box(Modifier.weight(.25f), contentAlignment = Alignment.Center) {
@@ -291,7 +291,7 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
             items(meds, key = { it.id }) { med ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text(med.name, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                        Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
                         if (med.specification.isNotBlank()) Text(med.specification, color = Quiet, fontSize = 12.sp)
                         Text(if (state.periods.any { it.medicineId == med.id && it.active }) "当前使用" else "已停用", color = Quiet, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     }
@@ -305,7 +305,7 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
 @Composable
 private fun MedicineDetail(med: Medicine, periods: List<UsePeriod>, image: (String) -> Unit, edit: () -> Unit, period: (UsePeriod) -> Unit, delete: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        item { Text(med.name, fontSize = 25.sp, fontWeight = FontWeight.Bold); if (med.specification.isNotBlank()) Text(med.specification, color = Quiet); if (med.defaultDose.isNotBlank()) Text("记录用量：${med.defaultDose}", fontSize = 13.sp, color = Quiet) }
+        item { Text(med.name + if (med.starred) " ⭐" else "", fontSize = 25.sp, fontWeight = FontWeight.Bold); if (med.specification.isNotBlank()) Text(med.specification, color = Quiet); if (med.defaultDose.isNotBlank()) Text("记录用量：${med.defaultDose}", fontSize = 13.sp, color = Quiet) }
         if (med.photos().isNotEmpty()) item { PhotoStrip(med.photos(), image) }
         item { TextButton(onClick = edit) { Text("编辑药品资料") } }
         item { Text("使用记录", fontWeight = FontWeight.SemiBold); Text("日期可留空，重新使用时添加新记录", fontSize = 12.sp, color = Quiet) }
@@ -391,7 +391,7 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
     if (chooser) {
         var query by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { chooser = false }, title = { Text("选择药品") }, text = { Column { SoftTextField(query, { query = it }, label = { Text("搜索名称") }); LazyColumn(Modifier.heightIn(max = 300.dp)) {
-            items(state.medicines.filter { it.name.contains(query, ignoreCase = true) }, key = { it.id }) { med -> TextButton(onClick = { selectedId = med.id; name = med.name; spec = med.specification; images = med.photos(); dose = med.defaultDose; chooser = false }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(med.name); if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet) } } }
+            items(state.medicines.filter { it.name.contains(query, ignoreCase = true) }, key = { it.id }) { med -> TextButton(onClick = { selectedId = med.id; name = med.name; spec = med.specification; images = med.photos(); dose = med.defaultDose; chooser = false }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(med.name + if (med.starred) " ⭐" else ""); if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, color = Quiet) } } }
         } } }, confirmButton = { TextButton(onClick = { chooser = false }) { Text("取消") } })
     }
 }
