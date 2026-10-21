@@ -534,7 +534,19 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
     var opened by remember(id) { mutableStateOf(false) }
     var distance by remember(id) { mutableFloatStateOf(0f) }
     fun settle() { scope.launch { offset.animateTo(if (opened) -reveal else 0f, tween(180)) } }
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).semantics { contentDescription = "药品条目：$name" }) {
+    val gestures = Modifier
+            .pointerInput(id, reveal) {
+                detectHorizontalDragGestures(
+                    onDragStart = { distance = 0f; scope.launch { offset.stop() } },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume(); distance += amount
+                        scope.launch { offset.snapTo((offset.value + amount).coerceIn(-reveal, 0f)) }
+                    },
+                    onDragEnd = { if (distance != 0f) opened = distance < 0f; settle() },
+                    onDragCancel = { settle() }
+                )
+            }
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
         if (offset.value < 0f) Row(Modifier.align(Alignment.CenterEnd).width(224.dp).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             val actions = listOf(
                 Triple("top", "置顶", Icons.Outlined.VerticalAlignTop),
@@ -551,18 +563,6 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
                 }
             }
         }
-        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth()
-            .background(background)
-            .pointerInput(id, reveal) {
-                detectHorizontalDragGestures(
-                    onDragStart = { distance = 0f; scope.launch { offset.stop() } },
-                    onHorizontalDrag = { change, amount ->
-                        change.consume(); distance += amount
-                        scope.launch { offset.snapTo((offset.value + amount).coerceIn(-reveal, 0f)) }
-                    },
-                    onDragEnd = { if (distance != 0f) opened = distance < 0f; settle() },
-                    onDragCancel = { settle() }
-                )
-            }) { content() }
+        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth().background(background)) { content() }
     }
 }
