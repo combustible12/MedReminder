@@ -3,6 +3,7 @@ package com.combustible12.medreminder
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -34,6 +35,10 @@ class SwipeRevealTest {
         } }
         shortSwipe(true)
         listOf("置顶", "置底", "标星", "删除").forEach { compose.onNodeWithContentDescription(it).assertIsDisplayed() }
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        val bytes = java.io.ByteArrayOutputStream().also { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+        val chunks = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP).chunked(3000)
+        chunks.forEachIndexed { index, chunk -> android.util.Log.i("MedReminderQA", "swipe-icons.png:$index/${chunks.size}:$chunk"); Thread.sleep(5) }
         shortSwipe(false)
         compose.onNodeWithContentDescription("置顶").assertDoesNotExist()
         for ((label, action) in listOf("置顶" to "top", "置底" to "bottom", "标星" to "star", "取消标星" to "star", "删除" to "delete")) {
