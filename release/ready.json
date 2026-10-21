@@ -1,11 +1,11 @@
 {
-  "version": "1.0.17",
-  "versionCode": 18,
+  "version": "1.0.18",
+  "versionCode": 19,
   "sources": {
-    "app/build.gradle.kts": "e711544d7b0b5a4bbac29fa7296c95af00a07830b1ec0d6efaa1a39085818a7c",
+    "app/build.gradle.kts": "324ec07f2cc02d4b112befc9f7e1175125bc53de6e03adec75614b3adf2e9632",
     "app/src/main/AndroidManifest.xml": "80f3623fe911c4450d3cdacbadc466dacf80d69f6446185edf8eb1acfc10ce0c",
     "app/src/main/java/com/combustible12/medreminder/Data.kt": "9c6b41e07b515ad154dc4707590bbdf663af61bb6f083bc0efa7bacb502b8fae",
-    "app/src/main/java/com/combustible12/medreminder/MainActivity.kt": "99486d7c560d13ac1238a551dcd30522502c201edcdceab94085cb92e2e22533",
+    "app/src/main/java/com/combustible12/medreminder/MainActivity.kt": "cb235cde917b024303cf3fed225606eafbc63ea813c86225a3eabd7143f712e1",
     "app/src/main/java/com/combustible12/medreminder/Photos.kt": "d5abcac3385957b07e75e51b09202733b1022da557cdad87c94c3a726e05d43f",
     "app/src/main/java/com/combustible12/medreminder/Reminders.kt": "a62e6c204065d284ef107b21bf92f5e796124957a527a30ce18e04030719e103",
     "app/src/main/java/com/combustible12/medreminder/Sharing.kt": "593faaca3e1b4adfa180edf97b95d87f1c9a82665c161d804d1c7f5b2e91f6b6",
@@ -21,6 +21,6 @@
     "gradle.properties": "1b8bb263791571896a03bbff7b73ff8ce8bc73de9fd69fc5e04749af7b428905",
     "settings.gradle.kts": "3d5d5e557b3b901178209d22a509f77996f330a8d257a089aef2f3796229d003"
   },
-  "acceptanceRun": 39550943330,
-  "sha256": "cbad1de884f53a566552d00efb4a357cb52fd22b23cf8fc363d39a0015800b51"
+  "acceptanceRun": 39554804025,
+  "sha256": "1b35d2a96e8b85de6040a36575f233c1bbb99c01c7e2563750fc8556d8ac02f6"
 }
