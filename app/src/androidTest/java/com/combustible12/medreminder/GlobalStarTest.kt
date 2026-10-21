@@ -49,9 +49,9 @@ class GlobalStarTest {
             val entities = schema.getJSONArray("entities")
             for (i in 0 until entities.length()) {
                 val entity = entities.getJSONObject(i)
-                old.execSQL(entity.getString("createSql").replace("${TABLE_NAME}", entity.getString("tableName")))
+                old.execSQL(entity.getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
                 val indices = entity.getJSONArray("indices")
-                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("${TABLE_NAME}", entity.getString("tableName")))
+                for (j in 0 until indices.length()) old.execSQL(indices.getJSONObject(j).getString("createSql").replace("\${TABLE_NAME}", entity.getString("tableName")))
             }
             old.execSQL("INSERT INTO cards VALUES(1,'',0,0)")
             old.execSQL("INSERT INTO groups VALUES(1,1,'A',0)")
