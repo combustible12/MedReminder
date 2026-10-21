@@ -528,7 +528,7 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
 
 /** A short horizontal swipe settles to an endpoint; long-press sorting remains separate. */
 @Composable internal fun SwipeMedicineActions(id: Long, starred: Boolean, name: String, background: Color, action: (String) -> Unit, content: @Composable () -> Unit) {
-    val reveal = with(LocalDensity.current) { 224.dp.toPx() }
+    val reveal = with(LocalDensity.current) { 200.dp.toPx() }
     val offset = remember(id) { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var opened by remember(id) { mutableStateOf(false) }
@@ -547,7 +547,7 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
                 )
             }
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
-        if (offset.value < 0f) Row(Modifier.align(Alignment.CenterEnd).width(224.dp).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (offset.value < 0f) Row(Modifier.align(Alignment.CenterEnd).width(200.dp).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
             val actions = listOf(
                 Triple("top", "置顶", Icons.Outlined.VerticalAlignTop),
                 Triple("bottom", "置底", Icons.Outlined.VerticalAlignBottom),
