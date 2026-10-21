@@ -1,12 +1,12 @@
 {
-  "version": "1.0.19",
-  "versionCode": 20,
+  "version": "1.0.20",
+  "versionCode": 21,
   "sources": {
-    "app/build.gradle.kts": "7328e5585089526152cbb3c3887e066f7fe09d352a7d29ec62e83c83bb3d3b9f",
+    "app/build.gradle.kts": "a27134bbabe06c8ae9d0b8b1186a704f1207e43a117aeb5093559eb4b5dbe5bc",
     "app/src/main/AndroidManifest.xml": "80f3623fe911c4450d3cdacbadc466dacf80d69f6446185edf8eb1acfc10ce0c",
-    "app/src/main/java/com/combustible12/medreminder/Data.kt": "3d183985d72208b3d7f1080c60cee758e945dac8c77c606be57034faed582a9e",
-    "app/src/main/java/com/combustible12/medreminder/MainActivity.kt": "3b756bb0017258f02b1be71b80fbf3573f58cb5d320842c39af6b8d5a82ff3a9",
-    "app/src/main/java/com/combustible12/medreminder/Photos.kt": "d5abcac3385957b07e75e51b09202733b1022da557cdad87c94c3a726e05d43f",
+    "app/src/main/java/com/combustible12/medreminder/Data.kt": "2cdb42d7f1144fb899afa6bf79187707eda37e84ff1b455fd146f4b4a13d0865",
+    "app/src/main/java/com/combustible12/medreminder/MainActivity.kt": "104510628826c714692125a08ede1e43580818c9760e2537e629b097c89ed21f",
+    "app/src/main/java/com/combustible12/medreminder/Photos.kt": "8fabec960a9dd93950d0abc75fc4010b0b3c7f54fdfbbe1c38438ea1d8bfc3b6",
     "app/src/main/java/com/combustible12/medreminder/Reminders.kt": "a62e6c204065d284ef107b21bf92f5e796124957a527a30ce18e04030719e103",
     "app/src/main/java/com/combustible12/medreminder/Sharing.kt": "593faaca3e1b4adfa180edf97b95d87f1c9a82665c161d804d1c7f5b2e91f6b6",
     "app/src/main/java/com/combustible12/medreminder/Updates.kt": "2e2ff782e3e3d50852ec6f20564e6e99cfc8dd531c28950247759776f9fdcd6e",
@@ -21,6 +21,6 @@
     "gradle.properties": "1b8bb263791571896a03bbff7b73ff8ce8bc73de9fd69fc5e04749af7b428905",
     "settings.gradle.kts": "3d5d5e557b3b901178209d22a509f77996f330a8d257a089aef2f3796229d003"
   },
-  "acceptanceRun": 39567212954,
-  "sha256": "9ca7cc2dcf62328d57549fe22d909672456bac9d07840e643b62184928af42e7"
+  "acceptanceRun": 39576379343,
+  "sha256": "69328b67aed880f2e2876b45e3d03686d9ed5e6d00233449c91f75ab46d5ed7b"
 }
