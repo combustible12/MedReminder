@@ -110,8 +110,15 @@ fun NotebookApp(app: MedApplication) {
         bottomBar = { NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0; detailId = null }, icon = { Icon(Icons.Outlined.StickyNote2, null) }, label = { Text("便签") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             NavigationBarItem(selected = tab == 1, onClick = { tab = 1; detailId = null }, icon = { Icon(Icons.Outlined.Inventory2, null) }, label = { Text("药品库") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
-        } },
-        floatingActionButton = { if (tab == 0 && detailId == null) FloatingActionButton(onClick = { cardEditor = NoteCard(color = state.cards.size % Colors.size) }, containerColor = Color(0xFF829BCD), contentColor = Color.White, shape = RoundedCornerShape(22.dp)) { Icon(Icons.Outlined.Add, "添加卡片") } }
+            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                FilledIconButton(
+                    onClick = { cardEditor = NoteCard(color = state.cards.size % Colors.size) },
+                    modifier = Modifier.size(48.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF829BCD), contentColor = Color.White),
+                    shape = RoundedCornerShape(16.dp)
+                ) { Icon(Icons.Outlined.Add, "添加卡片") }
+            }
+        } }
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             if (state.reminders.any { it.enabled } && permissionProblem != null) TextButton(onClick = { permissionSheet = true }, modifier = Modifier.fillMaxWidth()) { Text("提醒未生效：$permissionProblem", color = Color(0xFFAF6A66), fontSize = 12.sp) }
@@ -121,8 +128,8 @@ fun NotebookApp(app: MedApplication) {
                     confirm = Confirmation("删除药品档案？", "将删除此药品的全部使用历史和关联首页条目，无法恢复。") { val images = detail.photos(); ReminderScheduler.mutex.withLock { repo.dao.deleteMedicine(detail.id) }; images.forEach { ImageStore(app).removeIfUnused(it, app.database) }; app.scheduler.scheduleAll(); detailId = null }
                 })
             } else if (tab == 0) {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    if (state.cards.isEmpty()) item { Column(Modifier.fillMaxWidth().padding(top = 50.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("从一张空白卡片开始", color = Quiet); Spacer(Modifier.height(4.dp)); Text("点击右下角 ＋ 添加", color = Quiet, fontSize = 13.sp) } }
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    if (state.cards.isEmpty()) item { Column(Modifier.fillMaxWidth().padding(top = 50.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("从一张空白卡片开始", color = Quiet); Spacer(Modifier.height(4.dp)); Text("点击底部右侧 ＋ 添加", color = Quiet, fontSize = 13.sp) } }
                     items(state.cards, key = { it.id }) { card ->
                         NoteCardView(card, state, { cardEditor = card }, { groupEditor = GroupEditor(card.id) }, { groupEditor = GroupEditor(card.id, it) }, { itemEditor = ItemEditor(it.id) }, { itemEditor = ItemEditor(it.groupId, it) }, { fullImage = it }, {
                             confirm = Confirmation("删除卡片？", "删除卡片内的大类和首页安排，并取消提醒。药品库和使用历史会保留。") {
