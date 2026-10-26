@@ -11,8 +11,8 @@ android {
         applicationId = "com.combustible12.medreminder"
         minSdk = 26
         targetSdk = 35
-        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 23
-        versionName = "1.0.22"
+        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 24
+        versionName = "1.0.23"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
