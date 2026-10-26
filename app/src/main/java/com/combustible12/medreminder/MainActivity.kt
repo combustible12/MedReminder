@@ -337,12 +337,6 @@ private fun MedicationDurationPage(state: Notebook, period: (UsePeriod) -> Unit)
                 val periods = state.periods.filter { it.medicineId == med.id }.sortedWith(compareByDescending<UsePeriod> { it.active }.thenByDescending { it.start ?: "" }.thenByDescending { it.id })
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).padding(horizontal = 15.dp, vertical = 11.dp)) {
                     Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                    Spacer(Modifier.height(7.dp))
-                    Row(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
-                        Text("开始日期", Modifier.weight(.38f), fontSize = 12.sp, color = Quiet)
-                        Text("结束日期", Modifier.weight(.38f), fontSize = 12.sp, color = Quiet)
-                        Text("时长", Modifier.weight(.24f), fontSize = 12.sp, color = Quiet, textAlign = androidx.compose.ui.text.style.TextAlign.End)
-                    }
                     if (periods.isEmpty()) Text("暂无记录", color = Quiet, fontSize = 13.sp, modifier = Modifier.padding(vertical = 7.dp))
                     periods.forEachIndexed { index, value ->
                         if (index > 0) HorizontalDivider(color = Color(0xFFE5E7EC))
