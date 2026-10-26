@@ -47,6 +47,10 @@ class UiTest {
         compose.onNodeWithText("甲药").assertDoesNotExist()
         compose.onNodeWithText("乙药").assertIsDisplayed()
         compose.onAllNodesWithText("＋ 添加使用记录").assertCountEquals(1)
+        compose.onNodeWithText("＋ 添加使用记录").performClick()
+        compose.onNodeWithContentDescription("选择开始日期").assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithContentDescription("选择结束日期").assertIsDisplayed().assertHasClickAction()
+        compose.onNodeWithText("YYYY-MM-DD").assertDoesNotExist()
     }
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
         compose.onNodeWithContentDescription("添加卡片").performClick()

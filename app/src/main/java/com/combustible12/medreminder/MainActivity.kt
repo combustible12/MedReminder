@@ -1,6 +1,7 @@
 package com.combustible12.medreminder
 
 import android.Manifest
+import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
@@ -59,6 +60,8 @@ import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
 
 private val Ink = Color(0xFF151B2D)
 private val Quiet = Color(0xFF8C929C)
@@ -489,18 +492,83 @@ private fun PeriodDialog(period: UsePeriod, dismiss: () -> Unit, save: (UsePerio
     var end by remember { mutableStateOf(period.end ?: "") }
     var error by remember { mutableStateOf<String?>(null) }
     EditorDialog(if (period.id == 0L) "添加早期使用记录" else "调整使用日期", dismiss, {
-        val a = start.trim().ifBlank { null }; val b = if (period.active) null else end.trim().ifBlank { null }
+        val a = start.ifBlank { null }; val b = if (period.active) null else end.ifBlank { null }
         try {
-            if (period.id == 0L) require(a != null && b != null) { "请填写开始和结束日期" }
+            if (period.id == 0L) require(a != null && b != null) { "请选择开始和结束日期" }
             validateDates(a, b)
             save(period.copy(start = a, end = b))
-        } catch (e: Exception) { error = if (e.message == "请填写开始和结束日期") e.message else "请用 YYYY-MM-DD 格式，停用日期不能早于开始日期" }
+        } catch (e: Exception) { error = e.message ?: "停用日期不能早于开始日期" }
     }) {
         if (period.id == 0L) Text("仅补录过去的用药时段，不改变当前用药状态", fontSize = 12.sp, color = Quiet)
-        SoftTextField(start, { start = it; error = null }, label = { Text(if (period.id == 0L) "开始日期" else "开始日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
-        if (!period.active) SoftTextField(end, { end = it; error = null }, label = { Text(if (period.id == 0L) "结束日期" else "停用日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
+        DateSelectionField(
+            value = start,
+            label = "开始日期",
+            optional = period.id != 0L,
+            maxDate = end.takeIf { !period.active && it.isNotBlank() }?.let { LocalDate.parse(it) },
+            change = { start = it; error = null }
+        )
+        if (!period.active) DateSelectionField(
+            value = end,
+            label = "结束日期",
+            optional = period.id != 0L,
+            minDate = start.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) },
+            change = { end = it; error = null }
+        )
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
         if (period.id != 0L) TextButton(onClick = delete) { Text("删除这段记录", color = Color(0xFFB56F71)) }
+    }
+}
+
+@Composable
+private fun DateSelectionField(
+    value: String,
+    label: String,
+    optional: Boolean,
+    minDate: LocalDate? = null,
+    maxDate: LocalDate? = null,
+    change: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val selected = remember(value) { value.takeIf { it.isNotBlank() }?.let { LocalDate.parse(it) } }
+    fun openPicker() {
+        val initial = selected ?: LocalDate.now()
+        DatePickerDialog(
+            context,
+            { _, year, month, day -> change("%04d-%02d-%02d".format(year, month + 1, day)) },
+            initial.year,
+            initial.monthValue - 1,
+            initial.dayOfMonth
+        ).apply {
+            minDate?.let { datePicker.minDate = it.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() }
+            maxDate?.let { datePicker.maxDate = it.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() }
+        }.show()
+    }
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 58.dp)
+            .clickable(onClick = ::openPicker)
+            .semantics { contentDescription = "选择$label" }
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 7.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(label + if (optional) "（可不选）" else "", fontSize = 12.sp, color = Quiet)
+                Text(selected?.toString() ?: "选择日期", fontSize = 17.sp, color = if (selected == null) Quiet else Ink)
+            }
+            if (optional && selected != null) {
+                IconButton(
+                    onClick = { change("") },
+                    modifier = Modifier.semantics { contentDescription = "清除$label" }
+                ) { Icon(Icons.Outlined.Close, null, tint = Quiet) }
+            } else {
+                Icon(Icons.Outlined.CalendarMonth, null, tint = Quiet, modifier = Modifier.padding(12.dp))
+            }
+        }
     }
 }
 
