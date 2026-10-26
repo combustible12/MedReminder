@@ -152,8 +152,8 @@ fun normalizeMealTiming(value: String): String {
 fun Medicine.usageLine(): String = listOf(specification.trim(), frequencyLabel(), defaultDose.trim().takeIf { it.isNotBlank() }?.let { "每次$it" }.orEmpty(), mealTiming).filter { it.isNotBlank() }.joinToString(" · ")
 
 fun UsePeriod.durationDays(today: LocalDate = LocalDate.now()): Long? {
-    val first = start?.let { runCatching(LocalDate::parse).getOrNull() } ?: return null
-    val last = end?.let { runCatching(LocalDate::parse).getOrNull() } ?: today
+    val first = start?.let { value -> runCatching { LocalDate.parse(value) }.getOrNull() } ?: return null
+    val last = end?.let { value -> runCatching { LocalDate.parse(value) }.getOrNull() } ?: today
     return ChronoUnit.DAYS.between(first, last).coerceAtLeast(0) + 1
 }
 
