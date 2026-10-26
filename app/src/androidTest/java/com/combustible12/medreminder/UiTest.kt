@@ -29,6 +29,25 @@ class UiTest {
         org.junit.Assert.assertTrue(runCatching { AppUpdater(compose.activity).validate(invalid) }.isFailure)
         invalid.delete()
     }
+    @Test fun medicationDurationIsIndependentSearchableOneMedicinePerCard() {
+        val repo = (compose.activity.application as MedApplication).repository
+        runBlocking {
+            val card = repo.dao.insertCard(NoteCard(name = "早"))
+            val group = repo.saveGroup(NoteGroup(cardId = card, name = "餐后"), Reminder(0))
+            repo.saveItem(group, null, null, "甲药", "", "1片", null)
+            repo.saveItem(group, null, null, "乙药", "", "1粒", null)
+        }
+        compose.onNodeWithText("用药时长").performClick()
+        compose.onNodeWithText("甲药").assertIsDisplayed()
+        compose.onNodeWithText("乙药").assertIsDisplayed()
+        compose.onAllNodesWithText("开始日期").assertCountEquals(2)
+        compose.onAllNodesWithText("结束日期").assertCountEquals(2)
+        compose.onAllNodesWithText("时长").assertCountEquals(2)
+        compose.onNodeWithText("搜索药品名称").performTextInput("乙")
+        compose.onNodeWithText("甲药").assertDoesNotExist()
+        compose.onNodeWithText("乙药").assertIsDisplayed()
+        compose.onAllNodesWithText("＋ 添加使用记录").assertCountEquals(1)
+    }
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
         compose.onNodeWithContentDescription("添加卡片").performClick()
         compose.onNodeWithText("保存").performClick()
@@ -84,7 +103,7 @@ class UiTest {
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("编辑项目").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("新药品").assertIsDisplayed()
-        compose.onNodeWithText("20mg").assertIsDisplayed()
+        compose.onNodeWithText("20mg").assertDoesNotExist()
         compose.onNodeWithText("3片").assertIsDisplayed()
         compose.onNodeWithText("新药品").performClick()
         compose.onNodeWithText("药品或护理名称").assertIsDisplayed()

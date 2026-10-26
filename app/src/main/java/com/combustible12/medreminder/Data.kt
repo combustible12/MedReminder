@@ -8,6 +8,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 @Entity(tableName = "cards")
@@ -67,6 +68,7 @@ interface MedDao {
     @Query("SELECT * FROM medicines WHERE id=:id") suspend fun medicine(id: Long): Medicine?
     @Query("SELECT * FROM medicines WHERE identity=:identity LIMIT 1") suspend fun findMedicine(identity: String): Medicine?
     @Query("SELECT * FROM items WHERE id=:id") suspend fun item(id: Long): NoteItem?
+    @Query("SELECT COUNT(*) FROM items WHERE medicineId=:medicineId") suspend fun itemCountForMedicine(medicineId: Long): Int
     @Query("SELECT * FROM items WHERE groupId=:id ORDER BY position, id") suspend fun groupItems(id: Long): List<NoteItem>
     @Query("SELECT * FROM periods WHERE medicineId=:id ORDER BY id DESC") suspend fun medicinePeriods(id: Long): List<UsePeriod>
     @Insert suspend fun insertCard(value: NoteCard): Long
@@ -149,6 +151,12 @@ fun normalizeMealTiming(value: String): String {
 }
 fun Medicine.usageLine(): String = listOf(specification.trim(), frequencyLabel(), defaultDose.trim().takeIf { it.isNotBlank() }?.let { "每次$it" }.orEmpty(), mealTiming).filter { it.isNotBlank() }.joinToString(" · ")
 
+fun UsePeriod.durationDays(today: LocalDate = LocalDate.now()): Long? {
+    val first = start?.let { runCatching(LocalDate::parse).getOrNull() } ?: return null
+    val last = end?.let { runCatching(LocalDate::parse).getOrNull() } ?: today
+    return ChronoUnit.DAYS.between(first, last).coerceAtLeast(0) + 1
+}
+
 private fun cardPeriod(name: String): Int? = when {
     name.contains("早") || name.contains("晨") -> 0
     name.contains("中") || name.contains("午") -> 1
@@ -161,7 +169,7 @@ fun automaticThreeDoseCards(cards: List<NoteCard>): List<Long>? {
     return (0..2).map { period -> ordered.firstOrNull { cardPeriod(it.name) == period }?.id ?: return null }
 }
 
-class Repository(val db: MedDatabase) {
+class Repository(val db: MedDatabase, private val today: () -> LocalDate = LocalDate::now) {
     val dao = db.dao()
     val notebook = combine(dao.cards(), dao.groups(), dao.items(), dao.medicines(), dao.periods()) { c, g, i, m, p -> Notebook(c, g, i, m, p) }.combine(dao.reminders()) { n, r -> n.copy(reminders = r) }.combine(dao.dividers()) { n, d -> n.copy(dividers = d) }
     suspend fun saveCard(value: NoteCard) { if (value.id == 0L) dao.insertCard(value.copy(position = dao.nextCard())) else dao.updateCard(value) }
@@ -192,9 +200,15 @@ class Repository(val db: MedDatabase) {
             val current = requireNotNull(dao.medicine(medId))
             dao.updateMedicine(current.copy(defaultDose = dose.trim(), dailyFrequency = normalizeDailyFrequency(dailyFrequency), mealTiming = normalizeMealTiming(mealTiming ?: current.mealTiming)))
         }
-        if (dao.medicinePeriods(medId).none { it.active }) dao.insertPeriod(UsePeriod(medicineId = medId))
-        if (old == null) dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId), starred = dao.medicine(medId)!!.starred))
-        else { dao.updateItem(old.copy(medicineId = medId, dose = dose.trim(), starred = dao.medicine(medId)!!.starred)); old.id }
+        if (old == null) {
+            startUseIfNeeded(medId)
+            dao.insertItem(NoteItem(groupId = groupId, medicineId = medId, dose = dose.trim(), position = dao.nextItem(groupId), starred = dao.medicine(medId)!!.starred))
+        } else {
+            if (old.medicineId != medId) startUseIfNeeded(medId)
+            dao.updateItem(old.copy(medicineId = medId, dose = dose.trim(), starred = dao.medicine(medId)!!.starred))
+            if (old.medicineId != medId) endUseIfNoItems(old.medicineId)
+            old.id
+        }
     }
     suspend fun addMedicineSchedule(groupId: Long, selectedId: Long?, name: String, spec: String, dose: String, image: String?, imagesJson: String, dailyFrequency: String, mealTiming: String, selectedCardIds: List<Long>): List<Long> = db.withTransaction {
         require(name.isNotBlank()) { "请填写名称" }
@@ -211,7 +225,7 @@ class Repository(val db: MedDatabase) {
             updateMedicine(existing.copy(name = name, specification = spec, defaultDose = dose.trim(), image = photos.firstOrNull(), imagesJson = encodePhotos(photos), dailyFrequency = normalizedFrequency, mealTiming = normalizedMealTiming))
             existing.id
         }
-        if (dao.medicinePeriods(medId).none { it.active }) dao.insertPeriod(UsePeriod(medicineId = medId))
+        startUseIfNeeded(medId)
 
         val cards = dao.cards().first()
         val count = normalizedFrequency.toIntOrNull()
@@ -254,6 +268,34 @@ class Repository(val db: MedDatabase) {
         require(previous == null || previous.active || !value.active) { "再次使用请添加新记录，原有日期会保留" }
         if (value.active) dao.medicinePeriods(value.medicineId).filter { it.active && it.id != value.id }.forEach { dao.updatePeriod(it.copy(active = false)) }
         if (value.id == 0L) dao.insertPeriod(value) else dao.updatePeriod(value)
+    }
+    private suspend fun startUseIfNeeded(medicineId: Long) {
+        if (dao.medicinePeriods(medicineId).none { it.active }) {
+            dao.insertPeriod(UsePeriod(medicineId = medicineId, start = today().toString()))
+        }
+    }
+    private suspend fun endUseIfNoItems(medicineId: Long) {
+        if (dao.itemCountForMedicine(medicineId) == 0) {
+            dao.medicinePeriods(medicineId).filter { it.active }.forEach {
+                dao.updatePeriod(it.copy(end = today().toString(), active = false))
+            }
+        }
+    }
+    suspend fun removeNoteItem(itemId: Long) = db.withTransaction {
+        val item = requireNotNull(dao.item(itemId)) { "条目已被删除" }
+        dao.deleteItem(itemId)
+        endUseIfNoItems(item.medicineId)
+    }
+    suspend fun removeNoteGroup(groupId: Long) = db.withTransaction {
+        val medicineIds = dao.groupItems(groupId).map { it.medicineId }.distinct()
+        dao.deleteGroup(groupId)
+        medicineIds.forEach { endUseIfNoItems(it) }
+    }
+    suspend fun removeNoteCard(cardId: Long) = db.withTransaction {
+        val groupIds = dao.groups().first().filter { it.cardId == cardId }.map { it.id }
+        val medicineIds = groupIds.flatMap { dao.groupItems(it) }.map { it.medicineId }.distinct()
+        dao.deleteCard(cardId)
+        medicineIds.forEach { endUseIfNoItems(it) }
     }
     suspend fun saveDivider(value: NoteDivider): Long = db.withTransaction {
         require(value.text.isNotBlank()) { "请填写分隔文字" }

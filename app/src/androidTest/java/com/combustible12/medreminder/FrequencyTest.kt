@@ -28,13 +28,12 @@ class FrequencyTest {
         compose.onNodeWithText("测试药品长名称 ⭐").performClick()
         compose.onNodeWithText("每天次数（可不填）").performTextInput("2")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil(10000) { compose.onAllNodesWithText("1天2次").fetchSemanticsNodes().isNotEmpty() }
-        val dose = compose.onNodeWithText("1片", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val freq = compose.onNodeWithText("1天2次", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue(freq.top >= dose.bottom)
-        assertTrue(kotlin.math.abs(freq.center.x - dose.center.x) < 2f)
+        compose.waitUntil(10000) { runBlocking { repo.dao.medicine(medId)!!.dailyFrequency == "2" } }
+        compose.onNodeWithText("1片").assertIsDisplayed()
+        compose.onNodeWithText("10mg").assertDoesNotExist()
+        compose.onNodeWithText("1天2次").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithText("1天2次").assertIsDisplayed()
+        compose.onNodeWithText("1天2次").assertDoesNotExist()
         compose.onNodeWithText("药品库").performClick()
         compose.onNodeWithText("10mg · 1天2次 · 每次1片").assertIsDisplayed()
         val file = java.io.File(compose.activity.getExternalFilesDir("qa"), "library-frequency.png")

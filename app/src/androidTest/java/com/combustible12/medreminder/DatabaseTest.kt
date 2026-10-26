@@ -12,6 +12,77 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class DatabaseTest {
+    @Test fun addingEarlierHistoryDoesNotChangeCurrentNoteUse() = runBlocking<Unit> {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val filename = "earlier-period-${System.nanoTime()}.db"
+        val db = Room.databaseBuilder(context, MedDatabase::class.java, filename).build()
+        try {
+            val repo = Repository(db) { java.time.LocalDate.parse("2026-10-26") }
+            val card = repo.dao.insertCard(NoteCard(name = "早"))
+            val group = repo.saveGroup(NoteGroup(cardId = card, name = "餐后"), Reminder(0))
+            val item = repo.saveItem(group, null, null, "测试药", "", "1片", null)
+            val medicineId = requireNotNull(repo.dao.item(item)).medicineId
+
+            repo.savePeriod(UsePeriod(medicineId = medicineId, start = "2026-09-01", end = "2026-09-10", active = false))
+
+            val periods = repo.dao.medicinePeriods(medicineId)
+            assertEquals(2, periods.size)
+            assertEquals(1, periods.count { it.active })
+            assertEquals("2026-10-26", periods.single { it.active }.start)
+            assertEquals("2026-09-10", periods.single { !it.active }.end)
+            Unit
+        } finally {
+            db.close()
+            context.deleteDatabase(filename)
+        }
+    }
+
+    @Test fun noteChangesAutomaticallyKeepSeparateUsePeriods() = runBlocking<Unit> {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val filename = "periods-${System.nanoTime()}.db"
+        val db = Room.databaseBuilder(context, MedDatabase::class.java, filename).build()
+        var day = java.time.LocalDate.parse("2026-10-26")
+        try {
+            val repo = Repository(db) { day }
+            val morning = repo.dao.insertCard(NoteCard(name = "早"))
+            val evening = repo.dao.insertCard(NoteCard(name = "晚"))
+            val morningGroup = repo.saveGroup(NoteGroup(cardId = morning, name = "餐后"), Reminder(0))
+            val eveningGroup = repo.saveGroup(NoteGroup(cardId = evening, name = "餐后"), Reminder(0))
+
+            val firstItem = repo.saveItem(morningGroup, null, null, "测试药", "", "1片", null)
+            val medicineId = requireNotNull(repo.dao.item(firstItem)).medicineId
+            assertEquals(listOf("2026-10-26"), repo.dao.medicinePeriods(medicineId).map { it.start })
+
+            val secondItem = repo.saveItem(eveningGroup, null, medicineId, "测试药", "", "1片", null)
+            assertEquals(1, repo.dao.medicinePeriods(medicineId).size)
+            repo.removeNoteItem(firstItem)
+            assertTrue(repo.dao.medicinePeriods(medicineId).single().active)
+
+            day = java.time.LocalDate.parse("2026-10-30")
+            repo.removeNoteItem(secondItem)
+            val firstPeriod = repo.dao.medicinePeriods(medicineId).single()
+            assertEquals("2026-10-26", firstPeriod.start)
+            assertEquals("2026-10-30", firstPeriod.end)
+            assertFalse(firstPeriod.active)
+
+            day = java.time.LocalDate.parse("2026-11-02")
+            repo.saveItem(morningGroup, null, medicineId, "测试药", "", "1片", null)
+            val periods = repo.dao.medicinePeriods(medicineId)
+            assertEquals(2, periods.size)
+            assertEquals("2026-11-02", periods.first().start)
+            assertTrue(periods.first().active)
+            assertEquals(firstPeriod, periods.last())
+
+            day = java.time.LocalDate.parse("2026-11-05")
+            repo.removeNoteCard(morning)
+            assertEquals("2026-11-05", repo.dao.medicinePeriods(medicineId).first().end)
+            Unit
+        } finally {
+            db.close()
+            context.deleteDatabase(filename)
+        }
+    }
+
     @Test fun reuseIndependentDosesHistoryDeletionAndReopen() = runBlocking<Unit> {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val filename = "acceptance-${System.nanoTime()}.db"

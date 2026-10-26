@@ -111,7 +111,7 @@ fun NotebookApp(app: MedApplication) {
     LaunchedEffect(state.reminders, permissionEpoch) { permissionProblem = app.scheduler.permissionProblem(); app.scheduler.scheduleAll() }
     BackHandler(detailId != null) { detailId = null }
     Scaffold(containerColor = Color.White, snackbarHost = { SnackbarHost(snack) },
-        topBar = { TopAppBar(title = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(if (detailId != null) "药品资料" else if (tab == 0) "用药便签" else "药品库", fontSize = 23.sp, fontWeight = FontWeight.SemiBold); if (tab == 0 && detailId == null) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AppUpdateButton(compact = true) } } }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
+        topBar = { TopAppBar(title = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(if (detailId != null) "药品资料" else when (tab) { 0 -> "用药便签"; 1 -> "药品库"; else -> "用药时长" }, fontSize = 23.sp, fontWeight = FontWeight.SemiBold); if (tab == 0 && detailId == null) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AppUpdateButton(compact = true) } } }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
             if (tab == 0 && detailId == null) {
                 IconButton(onClick = { order = OrderEditor("排列卡片", state.cards.map { it.id to it.name.ifBlank { "未命名卡片" } }, repo::reorderCards) }) { Icon(Icons.Outlined.SwapVert, "调整卡片顺序", tint = Quiet) }
                 IconButton(onClick = { permissionSheet = true }) { Icon(Icons.Outlined.NotificationsNone, "提醒权限", tint = Quiet) }
@@ -120,6 +120,7 @@ fun NotebookApp(app: MedApplication) {
         bottomBar = { NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
             NavigationBarItem(selected = tab == 0, onClick = { tab = 0; detailId = null }, icon = { Icon(Icons.Outlined.StickyNote2, null) }, label = { Text("便签") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             NavigationBarItem(selected = tab == 1, onClick = { tab = 1; detailId = null }, icon = { Icon(Icons.Outlined.Inventory2, null) }, label = { Text("药品库") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
+            NavigationBarItem(selected = tab == 2, onClick = { tab = 2; detailId = null }, icon = { Icon(Icons.Outlined.History, null) }, label = { Text("用药时长") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 FilledIconButton(
                     onClick = { cardEditor = NoteCard(color = state.cards.size % Colors.size) },
@@ -134,7 +135,7 @@ fun NotebookApp(app: MedApplication) {
             if (state.reminders.any { it.enabled } && permissionProblem != null) TextButton(onClick = { permissionSheet = true }, modifier = Modifier.fillMaxWidth()) { Text("提醒未生效：$permissionProblem", color = Color(0xFFAF6A66), fontSize = 12.sp) }
             val detail = state.medicines.firstOrNull { it.id == detailId }
             if (detailId != null && detail != null) {
-                MedicineDetail(detail, state.periods.filter { it.medicineId == detail.id }, { fullImage = it }, { medicineEditor = detail }, { periodEditor = it }, {
+                MedicineDetail(detail, { fullImage = it }, { medicineEditor = detail }, {
                     confirm = Confirmation("删除药品档案？", "将删除此药品的全部使用历史和关联首页条目，无法恢复。") { val images = detail.photos(); ReminderScheduler.mutex.withLock { repo.dao.deleteMedicine(detail.id) }; images.forEach { ImageStore(app).removeIfUnused(it, app.database) }; app.scheduler.scheduleAll(); detailId = null }
                 })
             } else if (tab == 0) {
@@ -142,12 +143,12 @@ fun NotebookApp(app: MedApplication) {
                     if (state.cards.isEmpty()) item { Column(Modifier.fillMaxWidth().padding(top = 50.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text("从一张空白卡片开始", color = Quiet); Spacer(Modifier.height(4.dp)); Text("点击底部右侧 ＋ 添加", color = Quiet, fontSize = 13.sp) } }
                     items(state.cards, key = { it.id }) { card ->
                         NoteCardView(card, state, { cardEditor = card }, { groupEditor = GroupEditor(card.id) }, { groupEditor = GroupEditor(card.id, it) }, { itemEditor = ItemEditor(it.id) }, { itemEditor = ItemEditor(it.groupId, it) }, { fullImage = it }, {
-                            confirm = Confirmation("删除卡片？", "删除卡片内的大类和首页安排，并取消提醒。药品库和使用历史会保留。") {
-                                ReminderScheduler.mutex.withLock { state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.dao.deleteCard(card.id) }
+                            confirm = Confirmation("删除卡片？", "删除卡片内的大类和便签安排，并取消提醒；不再出现在其他便签中的药品将自动记录停药日期。") {
+                                ReminderScheduler.mutex.withLock { state.groups.filter { it.cardId == card.id }.forEach { app.scheduler.cancel(it.id) }; repo.removeNoteCard(card.id) }
                             }
                         }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it }, { group, keys -> perform { repo.reorderEntries(group.id, keys) } }, { item, action ->
                             when (action) {
-                                "delete" -> confirm = Confirmation("删除便签条目？", "只移除此处安排，药品库和使用历史会保留。") { repo.dao.deleteItem(item.id); app.scheduler.cancel(item.groupId); app.scheduler.schedule(item.groupId) }
+                                "delete" -> confirm = Confirmation("删除便签条目？", "只移除此处安排；若这是该药最后一条便签，将自动记录停药日期。") { repo.removeNoteItem(item.id); app.scheduler.cancel(item.groupId); app.scheduler.schedule(item.groupId) }
                                 "top" -> perform { repo.moveItemToEdge(item.id, true) }
                                 "bottom" -> perform { repo.moveItemToEdge(item.id, false) }
                                 "star" -> perform { repo.toggleItemStar(item.id) }
@@ -155,13 +156,14 @@ fun NotebookApp(app: MedApplication) {
                         })
                     }
                 }
-            } else { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
+            } else if (tab == 1) { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
+            else { MedicationDurationPage(state) { periodEditor = it } }
         }
     }
     cardEditor?.let { card -> CardDialog(card, { cardEditor = null }) { updated -> perform { repo.saveCard(updated); cardEditor = null } } }
     groupEditor?.let { editor -> GroupDialog(editor, state.reminders.firstOrNull { it.groupId == editor.group?.id }, { groupEditor = null }, { updated, reminder -> perform { val id = repo.saveGroup(updated, reminder); app.scheduler.schedule(id)?.let { snack.showSnackbar(it) }; groupEditor = null } }, {
         val g = editor.group ?: return@GroupDialog
-        confirm = Confirmation("删除大类？", "取消此大类提醒并删除首页安排，药品库和历史记录会保留。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.dao.deleteGroup(g.id) }; groupEditor = null }
+        confirm = Confirmation("删除大类？", "取消此大类提醒并删除便签安排；不再出现在其他便签中的药品将自动记录停药日期。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.removeNoteGroup(g.id) }; groupEditor = null }
     }) }
     dividerEditor?.let { divider -> DividerDialog(divider, { dividerEditor = null }, { text -> perform { repo.saveDivider(divider.copy(text = text)); dividerEditor = null } }, {
         confirm = Confirmation("删除分隔条？", "只删除这条分隔线，药品安排保留。") { repo.dao.deleteDivider(divider.id); dividerEditor = null }
@@ -173,7 +175,7 @@ fun NotebookApp(app: MedApplication) {
         app.scheduler.scheduleAll(); itemEditor = null
     } }, {
         val i = editor.item ?: return@ItemDialog
-        confirm = Confirmation("删除首页条目？", "只移除此处安排，药品库和使用历史会保留。") { repo.dao.deleteItem(i.id); app.scheduler.cancel(i.groupId); app.scheduler.schedule(i.groupId); itemEditor = null }
+        confirm = Confirmation("删除首页条目？", "只移除此处安排；若这是该药最后一条便签，将自动记录停药日期。") { repo.removeNoteItem(i.id); app.scheduler.cancel(i.groupId); app.scheduler.schedule(i.groupId); itemEditor = null }
     }) }
     medicineEditor?.let { med -> MedicineDialog(med, app, { medicineEditor = null }) { updated -> perform { repo.updateMedicine(updated); med.photos().forEach { ImageStore(app).removeIfUnused(it, app.database) }; medicineEditor = null } } }
     periodEditor?.let { period -> PeriodDialog(period, { periodEditor = null }, { updated -> perform { repo.savePeriod(updated); periodEditor = null } }, { confirm = Confirmation("删除这段使用记录？", "只删除这段日期记录，不删除药品和首页安排。") { repo.dao.deletePeriod(period.id); periodEditor = null } }) }
@@ -255,11 +257,9 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                             Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 Column(Modifier.weight(.45f)) {
                                     Text(med.name + if (med.starred) " ⭐" else "", fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-                                    if (med.specification.isNotBlank()) Text(med.specification, fontSize = 12.sp, lineHeight = 18.sp, color = Quiet, modifier = Modifier.padding(top = 0.75.dp))
                                 }
                                 Column(Modifier.weight(.25f), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(item.dose, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Ink)
-                                    if (med.dailyFrequency.isNotBlank()) Text(med.frequencyLabel(), fontSize = 12.sp, color = Quiet, modifier = Modifier.padding(top = 4.dp))
                                 }
                                 Box(Modifier.weight(.30f), contentAlignment = Alignment.CenterEnd) {
                                     med.image?.let { path -> AsyncImage(File(path), "查看${med.name}图片", Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
@@ -312,20 +312,47 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
 }
 
 @Composable
-private fun MedicineDetail(med: Medicine, periods: List<UsePeriod>, image: (String) -> Unit, edit: () -> Unit, period: (UsePeriod) -> Unit, delete: () -> Unit) {
+private fun MedicineDetail(med: Medicine, image: (String) -> Unit, edit: () -> Unit, delete: () -> Unit) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 22.dp, vertical = 11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         item { Text(med.name + if (med.starred) " ⭐" else "", fontSize = 25.sp, fontWeight = FontWeight.Bold); if (med.usageLine().isNotBlank()) Text(med.usageLine(), color = Quiet, fontSize = 13.sp) }
         if (med.photos().isNotEmpty()) item { PhotoStrip(med.photos(), image) }
         item { TextButton(onClick = edit) { Text("编辑药品资料") } }
-        item { Text("使用记录", fontWeight = FontWeight.SemiBold); Text("日期可留空，重新使用时添加新记录", fontSize = 12.sp, color = Quiet) }
-        items(periods, key = { it.id }) { p ->
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFFF5F6FA)).clickable { period(p) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Text(if (p.active) "当前使用" else "已停用", fontWeight = FontWeight.Medium)
-                if (p.start != null || p.end != null) Text(if (p.active) "${p.start ?: "开始日期未填"} 至今" else "${p.start ?: "开始日期未填"} 至 ${p.end ?: "停用日期未填"}", fontSize = 13.sp, color = Quiet)
+        item { TextButton(onClick = delete) { Text("删除药品档案", color = Color(0xFFB56F71)) } }
+    }
+}
+
+@Composable
+private fun MedicationDurationPage(state: Notebook, period: (UsePeriod) -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val medicines = state.medicines.filter { it.name.contains(query, ignoreCase = true) }
+    Column(Modifier.padding(horizontal = 18.dp)) {
+        SoftTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("搜索药品名称") }, leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Quiet) }, singleLine = true, shape = RoundedCornerShape(18.dp))
+        Spacer(Modifier.height(7.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(bottom = 12.dp)) {
+            if (medicines.isEmpty()) item { Text("暂无药品记录", color = Quiet, modifier = Modifier.padding(vertical = 20.dp)) }
+            items(medicines, key = { it.id }) { med ->
+                val periods = state.periods.filter { it.medicineId == med.id }.sortedWith(compareByDescending<UsePeriod> { it.active }.thenByDescending { it.start ?: "" }.thenByDescending { it.id })
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).padding(horizontal = 15.dp, vertical = 11.dp)) {
+                    Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                    Spacer(Modifier.height(7.dp))
+                    Row(Modifier.fillMaxWidth().padding(bottom = 6.dp)) {
+                        Text("开始日期", Modifier.weight(.38f), fontSize = 12.sp, color = Quiet)
+                        Text("结束日期", Modifier.weight(.38f), fontSize = 12.sp, color = Quiet)
+                        Text("时长", Modifier.weight(.24f), fontSize = 12.sp, color = Quiet, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                    }
+                    if (periods.isEmpty()) Text("暂无记录", color = Quiet, fontSize = 13.sp, modifier = Modifier.padding(vertical = 7.dp))
+                    periods.forEachIndexed { index, value ->
+                        if (index > 0) HorizontalDivider(color = Color(0xFFE5E7EC))
+                        Row(Modifier.fillMaxWidth().clickable { period(value) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(value.start ?: "未填", Modifier.weight(.38f), fontSize = 13.sp, maxLines = 1)
+                            Text(if (value.active) "至今" else value.end ?: "未填", Modifier.weight(.38f), fontSize = 13.sp, maxLines = 1)
+                            Text(value.durationDays()?.let { "${it}天" } ?: "—", Modifier.weight(.24f), fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1)
+                        }
+                    }
+                    TextButton(onClick = { period(UsePeriod(medicineId = med.id, active = false)) }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) { Text("＋ 添加使用记录", fontSize = 13.sp) }
+                }
             }
         }
-        item { TextButton(onClick = { period(UsePeriod(medicineId = med.id)) }) { Text("＋ 添加使用记录") } }
-        item { TextButton(onClick = delete) { Text("删除药品档案", color = Color(0xFFB56F71)) } }
     }
 }
 
@@ -460,16 +487,18 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
 private fun PeriodDialog(period: UsePeriod, dismiss: () -> Unit, save: (UsePeriod) -> Unit, delete: () -> Unit) {
     var start by remember { mutableStateOf(period.start ?: "") }
     var end by remember { mutableStateOf(period.end ?: "") }
-    var active by remember { mutableStateOf(period.active) }
     var error by remember { mutableStateOf<String?>(null) }
-    EditorDialog("使用日期记录", dismiss, {
-        val a = start.trim().ifBlank { null }; val b = if (active) null else end.trim().ifBlank { null }
-        try { validateDates(a, b); save(period.copy(start = a, end = b, active = active)) } catch (_: Exception) { error = "请用 YYYY-MM-DD 格式，停用日期不能早于开始日期" }
+    EditorDialog(if (period.id == 0L) "添加早期使用记录" else "调整使用日期", dismiss, {
+        val a = start.trim().ifBlank { null }; val b = if (period.active) null else end.trim().ifBlank { null }
+        try {
+            if (period.id == 0L) require(a != null && b != null) { "请填写开始和结束日期" }
+            validateDates(a, b)
+            save(period.copy(start = a, end = b))
+        } catch (e: Exception) { error = if (e.message == "请填写开始和结束日期") e.message else "请用 YYYY-MM-DD 格式，停用日期不能早于开始日期" }
     }) {
-        SoftTextField(start, { start = it; error = null }, label = { Text("开始日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
-        if (period.id == 0L || period.active) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text("当前使用", Modifier.weight(1f)); Switch(active, { active = it }, colors = SwitchDefaults.colors(uncheckedBorderColor = Color.Transparent)) }
-        else Text("此段已停用。再次使用请添加新的使用记录，原有日期会保留。", fontSize = 12.sp, color = Quiet)
-        if (!active) SoftTextField(end, { end = it; error = null }, label = { Text("停用日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
+        if (period.id == 0L) Text("仅补录过去的用药时段，不改变当前用药状态", fontSize = 12.sp, color = Quiet)
+        SoftTextField(start, { start = it; error = null }, label = { Text(if (period.id == 0L) "开始日期" else "开始日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
+        if (!period.active) SoftTextField(end, { end = it; error = null }, label = { Text(if (period.id == 0L) "结束日期" else "停用日期（可不填）") }, placeholder = { Text("YYYY-MM-DD") }, modifier = Modifier.fillMaxWidth())
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 12.sp) }
         if (period.id != 0L) TextButton(onClick = delete) { Text("删除这段记录", color = Color(0xFFB56F71)) }
     }

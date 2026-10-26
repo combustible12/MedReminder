@@ -1,10 +1,16 @@
 package com.combustible12.medreminder
 
+import java.time.LocalDate
 import org.junit.Assert.*
 import org.junit.Test
 import java.time.ZonedDateTime
 
 class RulesTest {
+    @Test fun useDurationCountsBothStartAndEndDates() {
+        assertEquals(1L, UsePeriod(medicineId = 1, start = "2026-10-26", end = "2026-10-26", active = false).durationDays(LocalDate.parse("2026-11-01")))
+        assertEquals(3L, UsePeriod(medicineId = 1, start = "2026-10-24").durationDays(LocalDate.parse("2026-10-26")))
+        assertNull(UsePeriod(medicineId = 1).durationDays(LocalDate.parse("2026-10-26")))
+    }
     @Test fun optionalFrequencyUsesDigitsAndRejectsInvalidCounts() {
         assertEquals("", normalizeDailyFrequency(""))
         assertEquals("2", normalizeDailyFrequency("02"))
