@@ -13,6 +13,19 @@ class RulesTest {
         listOf("0", "-1", "1.5", "两次").forEach { assertTrue(runCatching { normalizeDailyFrequency(it) }.isFailure) }
     }
 
+    @Test fun usageLineKeepsSpecificationDoseFrequencyAndMealTimingTogether() {
+        assertEquals("20mg · 1天3次 · 每次1片 · 餐后", Medicine(name = "药", specification = "20mg", defaultDose = "1片", dailyFrequency = "3", mealTiming = "餐后").usageLine())
+        assertEquals("20mg", Medicine(name = "药", specification = "20mg").usageLine())
+        assertEquals("餐前", normalizeMealTiming(" 餐前 "))
+        assertTrue(runCatching { normalizeMealTiming("睡前") }.isFailure)
+    }
+
+    @Test fun threeDoseCardsMatchMorningNoonAndEveningInOrder() {
+        val cards = listOf(NoteCard(9, "晚间", position = 0), NoteCard(8, "早晨", position = 1), NoteCard(7, "中午", position = 2))
+        assertEquals(listOf(8L, 7L, 9L), automaticThreeDoseCards(cards))
+        assertNull(automaticThreeDoseCards(cards.dropLast(1)))
+    }
+
     @Test fun blankTimeDoesNotDisplay() { assertNull(Reminder(1).time()); assertEquals("08:05", Reminder(1, 8, 5).time()) }
     @Test fun identityUsesNameAndSpecificationOnly() { assertEquals(identityOf(" 药品 A ", "20mg"), identityOf("药品 A", "20mg ")); assertNotEquals(identityOf("药品 A", "20mg"), identityOf("药品 A", "40mg")) }
     @Test fun nextDailyAlarmUsesTomorrowWhenTimePassed() {

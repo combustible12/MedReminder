@@ -36,12 +36,7 @@ class FrequencyTest {
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("1天2次").assertIsDisplayed()
         compose.onNodeWithText("药品库").performClick()
-        compose.onNodeWithText("1天2次").assertIsDisplayed()
-        val nameBounds = compose.onNodeWithText("测试药品长名称 ⭐", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val label = compose.onNodeWithText("1天2次", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
-        assertTrue(label.top >= nameBounds.bottom)
-        assertTrue(kotlin.math.abs(label.center.x - root.center.x) < 3f)
+        compose.onNodeWithText("10mg · 1天2次 · 每次1片").assertIsDisplayed()
         val file = java.io.File(compose.activity.getExternalFilesDir("qa"), "library-frequency.png")
         file.parentFile!!.mkdirs()
         file.outputStream().use { compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -52,12 +47,12 @@ class FrequencyTest {
         compose.onNodeWithText("每天次数（可不填）").performTextReplacement("3")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { runBlocking { repo.dao.medicine(medId)!!.dailyFrequency == "3" } }
-        compose.onNodeWithText("1天3次").assertIsDisplayed()
+        compose.onNodeWithText("1天3次", substring = true).assertIsDisplayed()
         compose.onNodeWithText("编辑药品资料").performClick()
         compose.onNodeWithText("每天次数（可不填）").performTextClearance()
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { runBlocking { repo.dao.medicine(medId)!!.dailyFrequency.isEmpty() } }
-        compose.onNodeWithText("1天3次").assertDoesNotExist()
+        compose.onNodeWithText("1天3次", substring = true).assertDoesNotExist()
         runBlocking {
             assertTrue(repo.dao.medicine(medId)!!.starred)
             app.database.clearAllTables()
