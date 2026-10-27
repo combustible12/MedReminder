@@ -766,7 +766,7 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
         if (offset.value < 0f) Row(Modifier.align(Alignment.CenterEnd).width(actionWidth).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
             val actions = if (stopOnly) listOf(
-                Triple("stop", "停用", Icons.Outlined.Block)
+                Triple("stop", "停用", Icons.Outlined.Delete)
             ) else listOf(
                 Triple("top", "置顶", Icons.Outlined.VerticalAlignTop),
                 Triple("bottom", "置底", Icons.Outlined.VerticalAlignBottom),
