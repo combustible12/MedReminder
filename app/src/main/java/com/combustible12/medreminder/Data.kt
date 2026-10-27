@@ -291,6 +291,12 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
             dao.insertPeriod(UsePeriod(medicineId = medicineId, start = today().toString()))
         }
     }
+    // Library "使用" reuses the same start-of-use logic as adding a medicine to a note.
+    // It does not decide which daily note or time group the medicine belongs to.
+    suspend fun beginMedicine(medicineId: Long) = db.withTransaction {
+        requireNotNull(dao.medicine(medicineId)) { "药品已被删除" }
+        startUseIfNeeded(medicineId)
+    }
     private suspend fun endUseIfNoItems(medicineId: Long) {
         if (dao.itemCountForMedicine(medicineId) == 0) {
             dao.medicinePeriods(medicineId).filter { it.active }.forEach {
