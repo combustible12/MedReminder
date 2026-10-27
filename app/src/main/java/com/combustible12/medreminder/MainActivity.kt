@@ -94,6 +94,7 @@ fun NotebookApp(app: MedApplication) {
     var itemEditor by remember { mutableStateOf<ItemEditor?>(null) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
     var medicineEditor by remember { mutableStateOf<Medicine?>(null) }
+    var libraryUseMedicine by remember { mutableStateOf<Medicine?>(null) }
     var periodEditor by remember { mutableStateOf<UsePeriod?>(null) }
     var confirm by remember { mutableStateOf<Confirmation?>(null) }
     var order by remember { mutableStateOf<OrderEditor?>(null) }
@@ -208,7 +209,7 @@ fun NotebookApp(app: MedApplication) {
                     }
                 }
             } else if (tab == 1) {
-                MedicineLibrary(state, { medicineEditor = it }, { fullImage = it }) { med ->
+                MedicineLibrary(state, { medicineEditor = it }, { fullImage = it }, { med ->
                     confirm = Confirmation(
                         "停用药品？",
                         "从所有便签时段移除该药品并记录今天为停用日期；药品档案和已有用药历史保留。",
@@ -221,7 +222,18 @@ fun NotebookApp(app: MedApplication) {
                             }
                         }
                     }
-                }
+                }, { med ->
+                    when (med.dailyFrequency.toIntOrNull()) {
+                        1, 2 -> libraryUseMedicine = med
+                        3 -> perform {
+                            repo.useLibraryMedicine(med.id, emptyList())
+                            app.scheduler.scheduleAll()
+                        }
+                        else -> scope.launch {
+                            snack.showSnackbar("请先在药品资料中设置每天1、2或3次")
+                        }
+                    }
+                })
             }
             else { MedicationDurationPage(state) { periodEditor = it } }
         }
@@ -256,6 +268,36 @@ fun NotebookApp(app: MedApplication) {
         med.photos().forEach { ImageStore(app).removeIfUnused(it, app.database) }
         medicineEditor = null
     } } }
+    libraryUseMedicine?.let { med ->
+        val required = med.dailyFrequency.toIntOrNull()
+        if (required == 1 || required == 2) {
+            var chosenCardIds by remember(med.id) { mutableStateOf(emptySet<Long>()) }
+            AlertDialog(
+                onDismissRequest = { libraryUseMedicine = null },
+                title = { Text("选择服用卡片") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("${med.name} · 一天${required}次（请选择${required}张卡片）", fontSize = 13.sp, color = Quiet)
+                        MedicineCardChoices(state.cards, chosenCardIds, required) { chosenCardIds = it }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = chosenCardIds.size == required && !busy,
+                        onClick = {
+                            val ids = chosenCardIds.toList()
+                            perform {
+                                repo.useLibraryMedicine(med.id, ids)
+                                app.scheduler.scheduleAll()
+                                libraryUseMedicine = null
+                            }
+                        }
+                    ) { Text("保存") }
+                },
+                dismissButton = { TextButton(onClick = { libraryUseMedicine = null }) { Text("取消") } }
+            )
+        }
+    }
     periodEditor?.let { period -> PeriodDialog(period, { periodEditor = null }, { updated -> perform { repo.savePeriod(updated); periodEditor = null } }, { confirm = Confirmation("删除这段使用记录？", "只删除这段日期记录，不删除药品和首页安排。") { repo.dao.deletePeriod(period.id); periodEditor = null } }) }
     confirm?.let { c -> AlertDialog(onDismissRequest = { confirm = null }, title = { Text(c.title) }, text = { Text(c.text) }, confirmButton = { TextButton(onClick = { confirm = null; perform(c.action) }) { Text(c.confirmLabel, color = Color(0xFFB56F71)) } }, dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消") } }) }
     order?.let { o -> OrderDialog(o, { order = null }) { ids -> perform { o.save(ids); order = null } } }
@@ -362,7 +404,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
 }
 
 @Composable
-private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (String) -> Unit, stop: (Medicine) -> Unit) {
+private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (String) -> Unit, stop: (Medicine) -> Unit, use: (Medicine) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableIntStateOf(0) }
     val activeMedicineIds = state.periods.filter { it.active }.mapTo(mutableSetOf()) { it.medicineId }
@@ -377,14 +419,8 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
             items(meds, key = { it.id }) { med ->
                 val active = med.id in activeMedicineIds
                 val card: @Composable () -> Unit = {
-                    // The swipe wrapper owns the 18dp clip for active cards; inactive cards clip themselves.
-                    // Only this card draws the gray surface, so the green stripe shares its edges.
-                    Box(
-                        Modifier.fillMaxWidth()
-                            .then(if (active) Modifier else Modifier.clip(RoundedCornerShape(18.dp)))
-                            .background(Color(0xFFF6F7FA))
-                            .clickable { open(med) }
-                    ) {
+                    // The shared swipe wrapper owns the 18dp clip for both active and inactive cards.
+                    Box(Modifier.fillMaxWidth().background(Color(0xFFF6F7FA)).clickable { open(med) }) {
                         if (active) Box(Modifier.matchParentSize()) {
                             Box(
                                 Modifier
@@ -406,11 +442,12 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
                         }
                     }
                 }
-                if (active) {
-                    SwipeMedicineActions(med.id, med.starred, med.name, Color(0xFFF6F7FA), { key ->
-                        if (key == "stop") stop(med)
-                    }, stopOnly = true) { card() }
-                } else card()
+                SwipeMedicineActions(med.id, med.starred, med.name, Color(0xFFF6F7FA), { key ->
+                    when (key) {
+                        "stop" -> stop(med)
+                        "use" -> use(med)
+                    }
+                }, libraryAction = if (active) "stop" else "use") { card() }
             }
         }
     }
@@ -759,9 +796,9 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
 
 
 /** A short horizontal swipe settles to an endpoint; long-press sorting remains separate. */
-@Composable internal fun SwipeMedicineActions(id: Long, starred: Boolean, name: String, background: Color, action: (String) -> Unit, stopOnly: Boolean = false, content: @Composable () -> Unit) {
-    // Keep the notes' gesture and action visuals. Library stop-use reveals one existing-style action.
-    val actionWidth = if (stopOnly) 50.dp else 200.dp
+@Composable internal fun SwipeMedicineActions(id: Long, starred: Boolean, name: String, background: Color, action: (String) -> Unit, libraryAction: String? = null, content: @Composable () -> Unit) {
+    // Same gestures, circle icons and slide behavior for note actions and mutually exclusive library actions.
+    val actionWidth = if (libraryAction != null) 50.dp else 200.dp
     val reveal = with(LocalDensity.current) { actionWidth.toPx() }
     val offset = remember(id) { Animatable(0f) }
     val scope = rememberCoroutineScope()
@@ -780,27 +817,29 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
                     onDragCancel = { settle() }
                 )
             }
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(if (stopOnly) 18.dp else 12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(if (libraryAction != null) 18.dp else 12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
         if (offset.value < 0f) Row(Modifier.align(Alignment.CenterEnd).width(actionWidth).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
-            val actions = if (stopOnly) listOf(
-                Triple("stop", "停用", Icons.Outlined.Delete)
-            ) else listOf(
+            val actions = when (libraryAction) {
+                "stop" -> listOf(Triple("stop", "停用", Icons.Outlined.Delete))
+                "use" -> listOf(Triple("use", "使用", Icons.Outlined.Check))
+                else -> listOf(
                 Triple("top", "置顶", Icons.Outlined.VerticalAlignTop),
                 Triple("bottom", "置底", Icons.Outlined.VerticalAlignBottom),
                 Triple("star", if (starred) "取消标星" else "标星", if (starred) Icons.Outlined.Star else Icons.Outlined.StarBorder),
                 Triple("delete", "删除", Icons.Outlined.Delete)
-            )
+                )
+            }
             val colors = listOf(Color(0xFF24BB65), Color(0xFF19ACE3), Color(0xFFE9B90A), Color(0xFFF04B4D))
             actions.forEachIndexed { index, (key, label, icon) ->
                 IconButton(onClick = { opened = false; settle(); action(key) }, modifier = Modifier.size(48.dp)) {
-                    Box(Modifier.size(40.dp).background(if (stopOnly) colors[3] else colors[index], CircleShape), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(40.dp).background(if (libraryAction == "stop") colors[3] else if (libraryAction == "use") colors[0] else colors[index], CircleShape), contentAlignment = Alignment.Center) {
                         Icon(icon, label, tint = Color.White, modifier = Modifier.size(25.dp))
                     }
                 }
             }
         }
         // The library's card draws its own surface; keep the notes' existing background unchanged.
-        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth().then(if (stopOnly) Modifier else Modifier.background(background))) { content() }
+        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth().then(if (libraryAction != null) Modifier else Modifier.background(background))) { content() }
     }
 }
 
