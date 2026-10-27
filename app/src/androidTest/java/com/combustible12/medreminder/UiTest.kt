@@ -110,6 +110,44 @@ class UiTest {
         compose.onNodeWithText("用药时长").performClick()
         org.junit.Assert.assertTrue(compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot.top < compose.onNodeWithText("A停用药").fetchSemanticsNode().boundsInRoot.top)
     }
+    @Test fun librarySwipeStopUsesNoteSwipeAndPreservesMedicineHistory() {
+        val repo = (compose.activity.application as MedApplication).repository
+        val medicineId = runBlocking {
+            val morning = repo.dao.insertCard(NoteCard(name = "早"))
+            val groupMorning = repo.saveGroup(NoteGroup(cardId = morning, name = "餐后"), Reminder(0))
+            val evening = repo.dao.insertCard(NoteCard(name = "晚"))
+            val groupEvening = repo.saveGroup(NoteGroup(cardId = evening, name = "餐后"), Reminder(0))
+            repo.saveItem(groupMorning, null, null, "联动停用测试药", "10mg", "1片", null)
+            repo.saveItem(groupEvening, null, null, "联动停用测试药", "10mg", "1片", null)
+            requireNotNull(repo.dao.findMedicine(identityOf("联动停用测试药", "10mg"))).id
+        }
+        compose.onNodeWithText("药品库").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithContentDescription("药品条目：联动停用测试药").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("药品条目：联动停用测试药").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("停用").assertIsDisplayed().performClick()
+        compose.onNodeWithText("停用药品？").assertIsDisplayed()
+        compose.onNodeWithText("取消").performClick()
+        runBlocking { org.junit.Assert.assertTrue(repo.dao.medicinePeriods(medicineId).any { it.active }) }
+        compose.onNodeWithContentDescription("药品条目：联动停用测试药").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("停用").assertIsDisplayed().performClick()
+        compose.onNodeWithText("停用").assertIsDisplayed().performClick()
+        compose.waitUntil(5000) {
+            runBlocking { repo.dao.medicinePeriods(medicineId).none { it.active } }
+        }
+        runBlocking {
+            org.junit.Assert.assertNotNull(repo.dao.medicine(medicineId))
+            org.junit.Assert.assertTrue(repo.dao.itemsForMedicine(medicineId).isEmpty())
+            val history = repo.dao.medicinePeriods(medicineId)
+            org.junit.Assert.assertTrue(history.isNotEmpty())
+            org.junit.Assert.assertTrue(history.all { !it.active && it.end == java.time.LocalDate.now().toString() })
+        }
+        compose.onNodeWithText("联动停用测试药").assertIsDisplayed()
+        compose.onNodeWithContentDescription("当前使用").assertDoesNotExist()
+        compose.onNodeWithText("便签").performClick()
+        compose.onNodeWithText("联动停用测试药").assertDoesNotExist()
+    }
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
         compose.onNodeWithContentDescription("添加卡片").performClick()
         compose.onNodeWithText("保存").performClick()
