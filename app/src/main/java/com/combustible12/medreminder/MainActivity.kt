@@ -359,11 +359,14 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            if (med.id in activeMedicineIds) Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF55A971)).semantics { contentDescription = "当前使用" })
-                            Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                        Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                        val usageLine = med.usageLine()
+                        if (med.id in activeMedicineIds || usageLine.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                if (med.id in activeMedicineIds) Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF98B3A0)).semantics { contentDescription = "当前使用" })
+                                if (usageLine.isNotBlank()) Text(usageLine, color = Quiet, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
-                        if (med.usageLine().isNotBlank()) Text(med.usageLine(), color = Quiet, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     med.image?.let { path -> AsyncImage(File(path), "查看图片", Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
                 }
