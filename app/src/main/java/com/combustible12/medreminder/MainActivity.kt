@@ -377,7 +377,14 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
             items(meds, key = { it.id }) { med ->
                 val active = med.id in activeMedicineIds
                 val card: @Composable () -> Unit = {
-                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }) {
+                    // The swipe wrapper owns the 18dp clip for active cards; inactive cards clip themselves.
+                    // Only this card draws the gray surface, so the green stripe shares its edges.
+                    Box(
+                        Modifier.fillMaxWidth()
+                            .then(if (active) Modifier else Modifier.clip(RoundedCornerShape(18.dp)))
+                            .background(Color(0xFFF6F7FA))
+                            .clickable { open(med) }
+                    ) {
                         if (active) Box(Modifier.matchParentSize()) {
                             Box(
                                 Modifier
@@ -773,7 +780,7 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
                     onDragCancel = { settle() }
                 )
             }
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(if (stopOnly) 18.dp else 12.dp)).then(gestures).semantics { contentDescription = "药品条目：$name" }) {
         if (offset.value < 0f) Row(Modifier.align(Alignment.CenterEnd).width(actionWidth).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
             val actions = if (stopOnly) listOf(
                 Triple("stop", "停用", Icons.Outlined.Delete)
@@ -792,7 +799,8 @@ internal fun DragEntryList(source: List<Long>, save: (List<Long>) -> Unit, conte
                 }
             }
         }
-        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth().background(background)) { content() }
+        // The library's card draws its own surface; keep the notes' existing background unchanged.
+        Box(Modifier.offset { IntOffset(offset.value.roundToInt(), 0) }.fillMaxWidth().then(if (stopOnly) Modifier else Modifier.background(background))) { content() }
     }
 }
 
