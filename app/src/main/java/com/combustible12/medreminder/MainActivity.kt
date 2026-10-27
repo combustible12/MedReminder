@@ -377,19 +377,25 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
             items(meds, key = { it.id }) { med ->
                 val active = med.id in activeMedicineIds
                 val card: @Composable () -> Unit = {
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }) {
+                        if (active) Box(Modifier.matchParentSize()) {
+                            Box(
+                                Modifier
+                                    .fillMaxHeight()
+                                    .width(12.dp)
+                                    .background(Color(0xFFDDE8E1))
+                                    .semantics { contentDescription = "当前使用" }
+                            )
+                        }
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Column(Modifier.weight(1f)) {
                                 Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
                                 val usageLine = med.usageLine()
-                                if (active || usageLine.isNotBlank()) {
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                        if (active) Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF98B3A0)).semantics { contentDescription = "当前使用" })
-                                        if (usageLine.isNotBlank()) Text(usageLine, color = Quiet, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    }
-                                }
+                                if (usageLine.isNotBlank()) Text(usageLine, color = Quiet, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             med.image?.let { path -> AsyncImage(File(path), "查看图片", Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
+                        }
                         }
                     }
                 }
