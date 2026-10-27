@@ -125,12 +125,17 @@ fun NotebookApp(app: MedApplication) {
             NavigationBarItem(selected = tab == 1, onClick = { tab = 1; detailId = null }, icon = { Icon(Icons.Outlined.Inventory2, null) }, label = { Text("药品库") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             NavigationBarItem(selected = tab == 2, onClick = { tab = 2; detailId = null }, icon = { Icon(Icons.Outlined.History, null) }, label = { Text("用药时长") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                FilledIconButton(
-                    onClick = { cardEditor = NoteCard(color = state.cards.size % Colors.size) },
-                    modifier = Modifier.size(48.dp),
-                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF829BCD), contentColor = Color.White),
-                    shape = RoundedCornerShape(16.dp)
-                ) { Icon(Icons.Outlined.Add, "添加卡片") }
+                if (detailId == null && tab != 2) {
+                    FilledIconButton(
+                        onClick = {
+                            if (tab == 0) cardEditor = NoteCard(color = state.cards.size % Colors.size)
+                            else medicineEditor = Medicine(name = "")
+                        },
+                        modifier = Modifier.size(48.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF829BCD), contentColor = Color.White),
+                        shape = RoundedCornerShape(16.dp)
+                    ) { Icon(Icons.Outlined.Add, if (tab == 0) "添加卡片" else "添加药品") }
+                }
             }
         } }
     ) { padding ->
@@ -151,7 +156,14 @@ fun NotebookApp(app: MedApplication) {
                             }
                         }, { order = OrderEditor("排列大类", state.groups.filter { it.cardId == card.id }.map { it.id to it.name }, repo::reorderGroups) }, { group -> order = OrderEditor("药品与分隔条排序", state.groupEntries(group.id).map { entry -> entry.key to (entry.divider?.let { "分隔条：${it.text}" } ?: state.medicines.firstOrNull { med -> med.id == entry.item?.medicineId }?.name.orEmpty()) }) { keys -> repo.reorderEntries(group.id, keys) } }, permissionProblem, { group -> dividerEditor = NoteDivider(groupId = group.id) }, { dividerEditor = it }, { group, keys -> perform { repo.reorderEntries(group.id, keys) } }, { item, action ->
                             when (action) {
-                                "delete" -> confirm = Confirmation("删除便签条目？", "只移除此处安排；若这是该药最后一条便签，将自动记录停药日期。") { repo.removeNoteItem(item.id); app.scheduler.cancel(item.groupId); app.scheduler.schedule(item.groupId) }
+                                "delete" -> confirm = Confirmation("删除药品？", "删除便签中全天所有时段的这个药品，并自动记录停药日期；药品库档案和既往用药记录保留。") {
+                                    ReminderScheduler.mutex.withLock {
+                                        repo.removeNoteItem(item.id).forEach { groupId ->
+                                            app.scheduler.cancel(groupId)
+                                            app.scheduler.schedule(groupId)
+                                        }
+                                    }
+                                }
                                 "top" -> perform { repo.moveItemToEdge(item.id, true) }
                                 "bottom" -> perform { repo.moveItemToEdge(item.id, false) }
                                 "star" -> perform { repo.toggleItemStar(item.id) }
@@ -178,9 +190,21 @@ fun NotebookApp(app: MedApplication) {
         app.scheduler.scheduleAll(); itemEditor = null
     } }, {
         val i = editor.item ?: return@ItemDialog
-        confirm = Confirmation("删除首页条目？", "只移除此处安排；若这是该药最后一条便签，将自动记录停药日期。") { repo.removeNoteItem(i.id); app.scheduler.cancel(i.groupId); app.scheduler.schedule(i.groupId); itemEditor = null }
+        confirm = Confirmation("删除药品？", "删除便签中全天所有时段的这个药品，并自动记录停药日期；药品库档案和既往用药记录保留。") {
+            ReminderScheduler.mutex.withLock {
+                repo.removeNoteItem(i.id).forEach { groupId ->
+                    app.scheduler.cancel(groupId)
+                    app.scheduler.schedule(groupId)
+                }
+            }
+            itemEditor = null
+        }
     }) }
-    medicineEditor?.let { med -> MedicineDialog(med, app, { medicineEditor = null }) { updated -> perform { repo.updateMedicine(updated); med.photos().forEach { ImageStore(app).removeIfUnused(it, app.database) }; medicineEditor = null } } }
+    medicineEditor?.let { med -> MedicineDialog(med, app, { medicineEditor = null }) { updated -> perform {
+        if (med.id == 0L) repo.addMedicine(updated) else repo.updateMedicine(updated)
+        med.photos().forEach { ImageStore(app).removeIfUnused(it, app.database) }
+        medicineEditor = null
+    } } }
     periodEditor?.let { period -> PeriodDialog(period, { periodEditor = null }, { updated -> perform { repo.savePeriod(updated); periodEditor = null } }, { confirm = Confirmation("删除这段使用记录？", "只删除这段日期记录，不删除药品和首页安排。") { repo.dao.deletePeriod(period.id); periodEditor = null } }) }
     confirm?.let { c -> AlertDialog(onDismissRequest = { confirm = null }, title = { Text(c.title) }, text = { Text(c.text) }, confirmButton = { TextButton(onClick = { confirm = null; perform(c.action) }) { Text("删除", color = Color(0xFFB56F71)) } }, dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消") } }) }
     order?.let { o -> OrderDialog(o, { order = null }) { ids -> perform { o.save(ids); order = null } } }
@@ -468,7 +492,7 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
     val imported = remember { mutableListOf<String>() }
     DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (uris.isNotEmpty()) scope.launch { loading = true; try { for (uri in uris) { val path = ImageStore(app).import(uri).also { imported.add(it) }; images = images + path } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
-    EditorDialog("编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, dailyFrequency = frequency, mealTiming = mealTiming, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
+    EditorDialog(if (med.id == 0L) "添加药品" else "编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, dailyFrequency = frequency, mealTiming = mealTiming, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
         Text("名称、规格和图片会同步用于引用此药品的首页条目。各条目的用量保持独立。", fontSize = 12.sp, color = Quiet)
         SoftTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())
         SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, modifier = Modifier.fillMaxWidth())

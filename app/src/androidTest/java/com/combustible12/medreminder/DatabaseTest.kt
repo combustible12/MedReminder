@@ -55,11 +55,11 @@ class DatabaseTest {
 
             val secondItem = repo.saveItem(eveningGroup, null, medicineId, "测试药", "", "1片", null)
             assertEquals(1, repo.dao.medicinePeriods(medicineId).size)
-            repo.removeNoteItem(firstItem)
-            assertTrue(repo.dao.medicinePeriods(medicineId).single().active)
-
             day = java.time.LocalDate.parse("2026-10-30")
-            repo.removeNoteItem(secondItem)
+            val affectedGroups = repo.removeNoteItem(firstItem)
+            assertEquals(setOf(morningGroup, eveningGroup), affectedGroups.toSet())
+            assertNull(repo.dao.item(firstItem))
+            assertNull(repo.dao.item(secondItem))
             val firstPeriod = repo.dao.medicinePeriods(medicineId).single()
             assertEquals("2026-10-26", firstPeriod.start)
             assertEquals("2026-10-30", firstPeriod.end)

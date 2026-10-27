@@ -68,6 +68,7 @@ interface MedDao {
     @Query("SELECT * FROM medicines WHERE id=:id") suspend fun medicine(id: Long): Medicine?
     @Query("SELECT * FROM medicines WHERE identity=:identity LIMIT 1") suspend fun findMedicine(identity: String): Medicine?
     @Query("SELECT * FROM items WHERE id=:id") suspend fun item(id: Long): NoteItem?
+    @Query("SELECT * FROM items WHERE medicineId=:medicineId ORDER BY groupId, position, id") suspend fun itemsForMedicine(medicineId: Long): List<NoteItem>
     @Query("SELECT COUNT(*) FROM items WHERE medicineId=:medicineId") suspend fun itemCountForMedicine(medicineId: Long): Int
     @Query("SELECT * FROM items WHERE groupId=:id ORDER BY position, id") suspend fun groupItems(id: Long): List<NoteItem>
     @Query("SELECT * FROM periods WHERE medicineId=:id ORDER BY id DESC") suspend fun medicinePeriods(id: Long): List<UsePeriod>
@@ -86,6 +87,7 @@ interface MedDao {
     @Query("DELETE FROM cards WHERE id=:id") suspend fun deleteCard(id: Long)
     @Query("DELETE FROM groups WHERE id=:id") suspend fun deleteGroup(id: Long)
     @Query("DELETE FROM items WHERE id=:id") suspend fun deleteItem(id: Long)
+    @Query("DELETE FROM items WHERE medicineId=:medicineId") suspend fun deleteItemsForMedicine(medicineId: Long)
     @Query("DELETE FROM medicines WHERE id=:id") suspend fun deleteMedicine(id: Long)
     @Query("DELETE FROM periods WHERE id=:id") suspend fun deletePeriod(id: Long)
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM cards") suspend fun nextCard(): Int
@@ -261,6 +263,21 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
         require(existing == null || existing.id == value.id) { "相同名称和规格的药品已存在，请使用已有档案" }
         dao.updateMedicine(value.copy(name = value.name.trim(), specification = value.specification.trim(), identity = identity, dailyFrequency = normalizeDailyFrequency(value.dailyFrequency), mealTiming = normalizeMealTiming(value.mealTiming)))
     }
+    suspend fun addMedicine(value: Medicine): Long = db.withTransaction {
+        require(value.id == 0L) { "药品档案已存在" }
+        require(value.name.isNotBlank()) { "请填写名称" }
+        val identity = identityOf(value.name, value.specification)
+        require(dao.findMedicine(identity) == null) { "相同名称和规格的药品已存在，请使用已有档案" }
+        dao.insertMedicine(
+            value.copy(
+                name = value.name.trim(),
+                specification = value.specification.trim(),
+                identity = identity,
+                dailyFrequency = normalizeDailyFrequency(value.dailyFrequency),
+                mealTiming = normalizeMealTiming(value.mealTiming)
+            )
+        )
+    }
     suspend fun savePeriod(value: UsePeriod) = db.withTransaction {
         validateDates(value.start, value.end)
         require(!value.active || value.end == null) { "当前使用记录不能有停用日期" }
@@ -281,10 +298,12 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
             }
         }
     }
-    suspend fun removeNoteItem(itemId: Long) = db.withTransaction {
+    suspend fun removeNoteItem(itemId: Long): List<Long> = db.withTransaction {
         val item = requireNotNull(dao.item(itemId)) { "条目已被删除" }
-        dao.deleteItem(itemId)
+        val affectedGroupIds = dao.itemsForMedicine(item.medicineId).map { it.groupId }.distinct()
+        dao.deleteItemsForMedicine(item.medicineId)
         endUseIfNoItems(item.medicineId)
+        affectedGroupIds
     }
     suspend fun removeNoteGroup(groupId: Long) = db.withTransaction {
         val medicineIds = dao.groupItems(groupId).map { it.medicineId }.distinct()

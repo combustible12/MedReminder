@@ -1,0 +1,154 @@
+name: Publish MedReminder
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "release/ready.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: medreminder-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore permanent signing identity
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MEDREMINDER_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.MEDREMINDER_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.MEDREMINDER_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.MEDREMINDER_KEY_PASSWORD }}
+        run: |
+          python3 - <<'PYTHON'
+          import base64, json, os
+          from pathlib import Path
+
+          for name in ("KEYSTORE_BASE64", "STORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD"):
+              if not os.environ.get(name):
+                  raise SystemExit("缺少永久签名配置：" + name)
+          ready = json.loads(Path("release/ready.json").read_text())
+          version_code = int(ready["versionCode"])
+          version_name = str(ready["versionName"])
+          source_base = str(ready["sourceBaseCommit"])
+          if version_code <= 0 or not version_name or len(source_base) != 40:
+              raise SystemExit("release/ready.json 内容无效")
+          key = Path(os.environ["RUNNER_TEMP"]) / "medreminder.jks"
+          key.write_bytes(base64.b64decode(os.environ["KEYSTORE_BASE64"]))
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write("MED_SIGNING_PATH=" + str(key) + "\n")
+              env.write("MED_SIGNING_STORE_PASSWORD=" + os.environ["STORE_PASSWORD"] + "\n")
+              env.write("MED_SIGNING_ALIAS=" + os.environ["KEY_ALIAS"] + "\n")
+              env.write("MED_SIGNING_KEY_PASSWORD=" + os.environ["KEY_PASSWORD"] + "\n")
+              env.write("MED_VERSION_CODE=" + str(version_code) + "\n")
+              env.write("MED_VERSION_NAME=" + version_name + "\n")
+              env.write("MED_SOURCE_BASE=" + source_base + "\n")
+          PYTHON
+
+      - name: Verify source binding
+        run: |
+          git cat-file -e "$MED_SOURCE_BASE^{commit}"
+          git diff --exit-code "$MED_SOURCE_BASE" -- app/src app/build.gradle.kts build.gradle.kts settings.gradle.kts gradle.properties
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Test and build signed APK
+        run: gradle :app:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleRelease --stacktrace
+
+      - name: Verify signing certificate
+        run: |
+          apksigner_path="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)"
+          "$apksigner_path" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk | tee "$RUNNER_TEMP/apk-certificate.txt"
+          actual="$(sed -n 's/.*certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-certificate.txt" | head -1 | tr 'A-F' 'a-f')"
+          expected="309069dbeb012d3221bf6ca9d82b006e2b9524da601d42dbd8ebc1aae078b2c1"
+          test "$actual" = "$expected"
+
+      - name: Prepare release files
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk "MedReminder-$MED_VERSION_NAME.apk"
+          python3 - <<'PYTHON'
+          import hashlib, json, os
+          from pathlib import Path
+
+          version = os.environ["MED_VERSION_NAME"]
+          tag = "v" + version + "-build." + os.environ["GITHUB_RUN_NUMBER"]
+          apk = Path("MedReminder-" + version + ".apk")
+          Path("update.json").write_text(json.dumps({
+              "name": "MedReminder " + version,
+              "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
+              "url": "https://github.com/combustible12/MedReminder/releases/download/" + tag + "/" + apk.name,
+          }, ensure_ascii=False))
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write("MED_RELEASE_TAG=" + tag + "\n")
+          PYTHON
+
+      - name: Download current release for upgrade test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/previous"
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern "*.apk" --dir "$RUNNER_TEMP/previous"
+          previous="$(find "$RUNNER_TEMP/previous" -name '*.apk' | head -1)"
+          test -n "$previous"
+          echo "MED_PREVIOUS_APK=$previous" >> "$GITHUB_ENV"
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify signed upgrade and launch
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          script: |
+            adb install "$MED_PREVIOUS_APK"
+            adb shell am start -W -n com.combustible12.medreminder/.MainActivity
+            adb install -r "MedReminder-$MED_VERSION_NAME.apk"
+            adb shell am start -W -n com.combustible12.medreminder/.MainActivity
+            adb shell sleep 3
+            adb shell pidof com.combustible12.medreminder
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$MED_RELEASE_TAG" "MedReminder-$MED_VERSION_NAME.apk" update.json \
+            --title "MedReminder $MED_VERSION_NAME" \
+            --notes-file docs/RELEASE_NOTES.md \
+            --latest \
+            --target "$GITHUB_SHA"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: MedReminder-release-${{ github.run_number }}
+          path: |
+            MedReminder-*.apk
+            update.json
+            app/build/reports/tests/

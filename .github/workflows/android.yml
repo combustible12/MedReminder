@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - "docs/**"
       - "README.md"
+      - "release/**"
   pull_request:
   workflow_dispatch:
 permissions:
@@ -91,60 +92,3 @@ jobs:
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
             qa-screenshots/
-  publish:
-    if: ${{ always() && github.ref == 'refs/heads/main' && (needs.build.result == 'success' || (needs.build.result == 'skipped' && (contains(github.event.head_commit.message, '[signed-layout-release]') || contains(github.event.head_commit.message, '[signed-release]')))) && (needs.acceptance.result == 'success' || needs.acceptance.result == 'skipped') }}
-    needs: [build, acceptance]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-      - name: Check signed deliverable
-        id: ready
-        run: echo "exists=$(test -f release/ready.json && echo true || echo false)" >> "$GITHUB_OUTPUT"
-      - name: Verify signed deliverable and source binding
-        if: steps.ready.outputs.exists == 'true'
-        run: python3 ci/verify_release.py
-      - name: Enable KVM for signed APK smoke test
-        if: ${{ steps.ready.outputs.exists == 'true' && !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') }}
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Install and launch signed release
-        if: ${{ steps.ready.outputs.exists == 'true' && !contains(github.event.head_commit.message, '[layout-release]') && !contains(github.event.head_commit.message, '[signed-layout-release]') }}
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 36
-          arch: x86_64
-          profile: pixel_2
-          disable-animations: true
-          script: |
-            curl -fL --retry 3 https://github.com/combustible12/MedReminder/releases/download/v1.0.0-build.13/MedReminder-1.0.0.apk -o /tmp/MedReminder-old.apk
-            adb install /tmp/MedReminder-old.apk
-            adb shell am start -W -n com.combustible12.medreminder/.MainActivity
-            adb shell sleep 3
-            adb install -r release/MedReminder-1.0.24.apk
-            adb shell am start -W -n com.combustible12.medreminder/.MainActivity
-            adb shell sleep 3
-            adb shell pidof com.combustible12.medreminder
-      - name: Publish installable APK
-        if: steps.ready.outputs.exists == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="v1.0.24-build.${{ github.run_number }}"
-          python3 - "$TAG" <<'PYTHON'
-          import hashlib, json, sys
-          from pathlib import Path
-          apk = Path("release/MedReminder-1.0.24.apk")
-          Path("release/update.json").write_text(json.dumps({"name": "MedReminder 1.0.24", "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "url": "https://github.com/combustible12/MedReminder/releases/download/" + sys.argv[1] + "/" + apk.name}))
-          PYTHON
-          gh release create "$TAG" release/MedReminder-1.0.24.apk release/update.json --title "MedReminder 1.0.24" --notes-file docs/RELEASE_NOTES.md --latest --target "${{ github.sha }}"

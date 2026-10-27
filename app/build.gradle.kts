@@ -11,8 +11,8 @@ android {
         applicationId = "com.combustible12.medreminder"
         minSdk = 26
         targetSdk = 35
-        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 25
-        versionName = "1.0.24"
+        versionCode = System.getenv("MED_VERSION_CODE")?.toIntOrNull() ?: 25
+        versionName = System.getenv("MED_VERSION_NAME") ?: "1.0.24"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -28,9 +28,9 @@ android {
     if (!signingPath.isNullOrBlank()) {
         signingConfigs.create("personal") {
             storeFile = file(signingPath)
-            storePassword = System.getenv("MED_SIGNING_PASSWORD")
-            keyAlias = "medreminder"
-            keyPassword = System.getenv("MED_SIGNING_PASSWORD")
+            storePassword = System.getenv("MED_SIGNING_STORE_PASSWORD")
+            keyAlias = System.getenv("MED_SIGNING_ALIAS")
+            keyPassword = System.getenv("MED_SIGNING_KEY_PASSWORD")
         }
         buildTypes.getByName("release").signingConfig = signingConfigs.getByName("personal")
     }
