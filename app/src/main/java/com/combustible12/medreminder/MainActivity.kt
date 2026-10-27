@@ -114,10 +114,20 @@ fun NotebookApp(app: MedApplication) {
     LaunchedEffect(state.reminders, permissionEpoch) { permissionProblem = app.scheduler.permissionProblem(); app.scheduler.scheduleAll() }
     BackHandler(detailId != null) { detailId = null }
     Scaffold(containerColor = Color.White, snackbarHost = { SnackbarHost(snack) },
-        topBar = { TopAppBar(title = { Box(Modifier.fillMaxWidth()) {
-            Text(if (detailId != null) "药品资料" else when (tab) { 0 -> "用药便签"; 1 -> "药品库"; else -> "用药时长" }, Modifier.align(Alignment.CenterStart), fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
-            if (detailId == null) Box(Modifier.align(Alignment.Center)) { AppUpdateButton(compact = true) }
-        } }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
+        topBar = { TopAppBar(title = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (detailId == null && tab == 1) {
+                    // Reserve the exact width of the original notes title without moving its update button.
+                    Box {
+                        Text("用药便签", modifier = Modifier.clearAndSetSemantics {}, color = Color.Transparent, fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
+                        Text("药品库", fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                } else {
+                    Text(if (detailId != null) "药品资料" else if (tab == 0) "用药便签" else "用药时长", fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
+                }
+                if (detailId == null) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AppUpdateButton(compact = true) }
+            }
+        }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
             if (detailId == null) {
                 if (tab == 0) {
                     IconButton(onClick = { order = OrderEditor("排列卡片", state.cards.map { it.id to it.name.ifBlank { "未命名卡片" } }, repo::reorderCards) }) { Icon(Icons.Outlined.SwapVert, "调整卡片顺序", tint = Quiet) }
