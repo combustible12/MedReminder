@@ -106,6 +106,15 @@ class UiTest {
         val nameBounds = compose.onNodeWithText("Z当前药", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         org.junit.Assert.assertTrue("Status strip is before the medicine name", statusBounds.right <= nameBounds.left)
         org.junit.Assert.assertTrue("Status strip spans the card height", statusBounds.height > nameBounds.height * 2f)
+        val cardBounds = compose.onNodeWithContentDescription("药品条目：Z当前药").fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertEquals("Status strip starts at the card edge", cardBounds.left, statusBounds.left, 1f)
+        // An 18dp outer corner must expose white at 4dp in both axes.
+        // A second 12dp gray swipe background would paint this pixel gray again.
+        val cornerInsetPx = (4f * compose.activity.resources.displayMetrics.density).toInt()
+        val snapshot = compose.onRoot().captureToImage().asAndroidBitmap()
+        val topLeftX = (cardBounds.left + cornerInsetPx).toInt()
+        val topLeftY = (cardBounds.top + cornerInsetPx).toInt()
+        org.junit.Assert.assertEquals("No gray swipe background outside the 18dp clipped card", android.graphics.Color.WHITE, snapshot.getPixel(topLeftX, topLeftY))
         compose.onAllNodesWithText("当前使用").assertCountEquals(1)
         compose.onAllNodesWithText("已停用").assertCountEquals(1)
         compose.onNodeWithText("用药时长").performClick()
