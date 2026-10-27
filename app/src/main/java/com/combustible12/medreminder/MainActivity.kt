@@ -501,7 +501,7 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
         Text("名称、规格和图片会同步用于引用此药品的首页条目。各条目的用量保持独立。", fontSize = 12.sp, color = Quiet)
         SoftTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())
         SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, modifier = Modifier.fillMaxWidth())
-        SoftTextField(dose, { dose = it }, label = { Text("复用时带出的用量（可不填）") }, modifier = Modifier.fillMaxWidth())
+        SoftTextField(dose, { dose = it }, label = { Text("每次用量") }, modifier = Modifier.fillMaxWidth())
         FrequencyField(frequency, { frequency = it })
         MealTimingField(mealTiming, { mealTiming = it })
         PhotoEditor(images, loading, true, { launcher.launch("image/*") }, { path -> images = images - path })
