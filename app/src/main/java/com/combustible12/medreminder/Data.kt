@@ -298,12 +298,21 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
             }
         }
     }
+    // Shared by the note swipe-delete action and the library's stop-use action.
+    // Both remove the medicine from every note group while preserving its library profile and use history.
+    private suspend fun removeMedicineFromNotes(medicineId: Long): List<Long> {
+        val affectedGroupIds = dao.itemsForMedicine(medicineId).map { it.groupId }.distinct()
+        dao.deleteItemsForMedicine(medicineId)
+        endUseIfNoItems(medicineId)
+        return affectedGroupIds
+    }
     suspend fun removeNoteItem(itemId: Long): List<Long> = db.withTransaction {
         val item = requireNotNull(dao.item(itemId)) { "条目已被删除" }
-        val affectedGroupIds = dao.itemsForMedicine(item.medicineId).map { it.groupId }.distinct()
-        dao.deleteItemsForMedicine(item.medicineId)
-        endUseIfNoItems(item.medicineId)
-        affectedGroupIds
+        removeMedicineFromNotes(item.medicineId)
+    }
+    suspend fun stopMedicine(medicineId: Long): List<Long> = db.withTransaction {
+        requireNotNull(dao.medicine(medicineId)) { "药品已被删除" }
+        removeMedicineFromNotes(medicineId)
     }
     suspend fun removeNoteGroup(groupId: Long) = db.withTransaction {
         val medicineIds = dao.groupItems(groupId).map { it.medicineId }.distinct()
