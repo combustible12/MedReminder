@@ -91,13 +91,20 @@ class UiTest {
             repo.addMedicine(Medicine(name = "A停用药"))
             val card = repo.dao.insertCard(NoteCard(name = "服药"))
             val group = repo.saveGroup(NoteGroup(cardId = card, name = "药品"), Reminder(0))
-            repo.saveItem(group, null, null, "Z当前药", "", "1片", null)
+            repo.saveItem(group, null, null, "Z当前药", "20mg", "1片", null)
         }
         compose.waitUntil(5000) { compose.onAllNodesWithText("Z当前药").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("药品库").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("A停用药").fetchSemanticsNodes().isNotEmpty() }
         org.junit.Assert.assertTrue(compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot.top < compose.onNodeWithText("A停用药").fetchSemanticsNode().boundsInRoot.top)
         compose.onNodeWithContentDescription("当前使用").assertIsDisplayed()
+        // The subtle active dot belongs to the specification row, not before the medicine name.
+        val statusBounds = compose.onNodeWithContentDescription("当前使用").fetchSemanticsNode().boundsInRoot
+        val nameBounds = compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot
+        val detailBounds = compose.onNodeWithText("20mg · 每次1片", substring = true).fetchSemanticsNode().boundsInRoot
+        org.junit.Assert.assertTrue("Status dot is below the medicine name", statusBounds.center.y > nameBounds.center.y)
+        org.junit.Assert.assertTrue("Status dot is before the specification", statusBounds.right <= detailBounds.left)
+        org.junit.Assert.assertEquals("Status dot and specification share a row", statusBounds.center.y, detailBounds.center.y, 3f)
         compose.onAllNodesWithText("当前使用").assertCountEquals(1)
         compose.onAllNodesWithText("已停用").assertCountEquals(1)
         compose.onNodeWithText("用药时长").performClick()
