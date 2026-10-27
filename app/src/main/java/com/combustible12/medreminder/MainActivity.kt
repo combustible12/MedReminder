@@ -389,7 +389,7 @@ private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (S
                             Box(
                                 Modifier
                                     .fillMaxHeight()
-                                    .width(12.dp)
+                                    .width(6.dp)
                                     .background(Color(0xFFDDE8E1))
                                     .semantics { contentDescription = "当前使用" }
                             )
