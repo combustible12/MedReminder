@@ -42,12 +42,13 @@ class FrequencyTest {
         val chunks = android.util.Base64.encodeToString(file.readBytes(), android.util.Base64.NO_WRAP).chunked(3000)
         chunks.forEachIndexed { index, chunk -> android.util.Log.i("MedReminderQA", "${file.name}:$index/${chunks.size}:$chunk"); Thread.sleep(5) }
         compose.onNodeWithText("测试药品长名称 ⭐").performClick()
-        compose.onNodeWithText("编辑药品资料").performClick()
+        compose.onNodeWithText("编辑药品资料").assertIsDisplayed()
         compose.onNodeWithText("每天次数（可不填）").performTextReplacement("3")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { runBlocking { repo.dao.medicine(medId)!!.dailyFrequency == "3" } }
         compose.onNodeWithText("1天3次", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("编辑药品资料").performClick()
+        compose.onNodeWithText("测试药品长名称 ⭐").performClick()
+        compose.onNodeWithText("编辑药品资料").assertIsDisplayed()
         compose.onNodeWithText("每天次数（可不填）").performTextClearance()
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { runBlocking { repo.dao.medicine(medId)!!.dailyFrequency.isEmpty() } }

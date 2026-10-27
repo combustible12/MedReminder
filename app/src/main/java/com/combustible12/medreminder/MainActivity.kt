@@ -171,7 +171,7 @@ fun NotebookApp(app: MedApplication) {
                         })
                     }
                 }
-            } else if (tab == 1) { MedicineLibrary(state, { detailId = it.id }, { fullImage = it }) }
+            } else if (tab == 1) { MedicineLibrary(state, { medicineEditor = it }, { fullImage = it }) }
             else { MedicationDurationPage(state) { periodEditor = it } }
         }
     }

@@ -60,6 +60,9 @@ class UiTest {
         compose.onNodeWithText("药品名称").performTextInput("仅药品库药品")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(5000) { compose.onAllNodesWithText("仅药品库药品").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("仅药品库药品").performClick()
+        compose.onNodeWithText("编辑药品资料").assertIsDisplayed()
+        compose.onNodeWithText("取消").performClick()
         compose.onNodeWithText("用药时长").performClick()
         compose.onNodeWithText("更新").assertIsDisplayed().assertHasClickAction()
         compose.onNodeWithText("仅药品库药品").assertIsDisplayed()
