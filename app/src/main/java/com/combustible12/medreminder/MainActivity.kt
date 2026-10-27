@@ -569,14 +569,9 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
         if (editor.item == null && (frequency.toIntOrNull() == 1 || frequency.toIntOrNull() == 2)) {
             val required = requireNotNull(frequency.toIntOrNull())
             Text("选择服用卡片（选$required 张）", fontSize = 13.sp, color = Quiet)
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                state.cards.sortedWith(compareBy<NoteCard> { it.position }.thenBy { it.id }).forEach { card ->
-                    val selectedCard = card.id in selectedCardIds
-                    FilterChip(selected = selectedCard, onClick = {
-                        selectedCardIds = if (selectedCard) selectedCardIds - card.id else if (selectedCardIds.size < required) selectedCardIds + card.id else selectedCardIds
-                        error = null
-                    }, label = { Text(card.name.ifBlank { "未命名卡片" }) }, border = null)
-                }
+            MedicineCardChoices(state.cards, selectedCardIds, required) {
+                selectedCardIds = it
+                error = null
             }
         } else if (editor.item == null && frequency == "3") {
             Text("保存后自动加入早、中、晚卡片，并按${mealTiming.ifBlank { "当前分类" }}放置", fontSize = 12.sp, color = Quiet)
@@ -591,6 +586,24 @@ private fun ItemDialog(editor: ItemEditor, state: Notebook, app: MedApplication,
         AlertDialog(onDismissRequest = { chooser = false }, title = { Text("选择药品") }, text = { Column { SoftTextField(query, { query = it }, label = { Text("搜索名称") }); LazyColumn(Modifier.heightIn(max = 300.dp)) {
             items(state.medicines.filter { it.name.contains(query, ignoreCase = true) }, key = { it.id }) { med -> TextButton(onClick = { selectedId = med.id; name = med.name; spec = med.specification; images = med.photos(); dose = med.defaultDose; frequency = med.dailyFrequency; mealTiming = med.mealTiming; chooser = false }, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(med.name + if (med.starred) " ⭐" else ""); if (med.usageLine().isNotBlank()) Text(med.usageLine(), fontSize = 12.sp, color = Quiet) } } }
         } } }, confirmButton = { TextButton(onClick = { chooser = false }) { Text("取消") } })
+    }
+}
+
+// Shared with the existing note editor: the library does not create a different card picker.
+@Composable
+private fun MedicineCardChoices(cards: List<NoteCard>, selectedCardIds: Set<Long>, required: Int, onChange: (Set<Long>) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        cards.sortedWith(compareBy<NoteCard> { it.position }.thenBy { it.id }).forEach { card ->
+            val selectedCard = card.id in selectedCardIds
+            FilterChip(
+                selected = selectedCard,
+                onClick = {
+                    onChange(if (selectedCard) selectedCardIds - card.id else if (selectedCardIds.size < required) selectedCardIds + card.id else selectedCardIds)
+                },
+                label = { Text(card.name.ifBlank { "未命名卡片" }) },
+                border = null
+            )
+        }
     }
 }
 
