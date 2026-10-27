@@ -55,7 +55,12 @@ class UiTest {
     @Test fun addButtonFollowsCurrentModuleAndLibraryMedicineDoesNotEnterNotes() {
         compose.onNodeWithContentDescription("添加卡片").assertIsDisplayed()
         val noteUpdateX = compose.onNodeWithText("更新").fetchSemanticsNode().boundsInRoot.center.x
+        // The notes page must keep the original Row layout: update centered between the title and right actions.
+        val noteTitleRight = compose.onNodeWithText("用药便签").fetchSemanticsNode().boundsInRoot.right
+        val notesActionLeft = compose.onNodeWithContentDescription("调整卡片顺序").fetchSemanticsNode().boundsInRoot.left
+        org.junit.Assert.assertEquals((noteTitleRight + notesActionLeft) / 2f, noteUpdateX, 32f)
         compose.onNodeWithText("药品库").performClick()
+        compose.onNodeWithText("用药便签").assertDoesNotExist()
         compose.onNodeWithText("更新").assertIsDisplayed().assertHasClickAction()
         org.junit.Assert.assertEquals(noteUpdateX, compose.onNodeWithText("更新").fetchSemanticsNode().boundsInRoot.center.x, 1f)
         compose.onNodeWithContentDescription("添加药品").performClick()
