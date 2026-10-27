@@ -81,6 +81,24 @@ class UiTest {
         compose.onNodeWithText("时长页药品").assertDoesNotExist()
         compose.onNodeWithContentDescription("添加卡片").assertIsDisplayed()
     }
+    @Test fun activeMedicinesSortFirstAndLibraryUsesOnlyGreenStatusDot() {
+        val repo = (compose.activity.application as MedApplication).repository
+        runBlocking {
+            repo.addMedicine(Medicine(name = "A停用药"))
+            val card = repo.dao.insertCard(NoteCard(name = "服药"))
+            val group = repo.saveGroup(NoteGroup(cardId = card, name = "药品"), Reminder(0))
+            repo.saveItem(group, null, null, "Z当前药", "", "1片", null)
+        }
+        compose.waitUntil(5000) { compose.onAllNodesWithText("Z当前药").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("药品库").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("A停用药").fetchSemanticsNodes().isNotEmpty() }
+        org.junit.Assert.assertTrue(compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot.top < compose.onNodeWithText("A停用药").fetchSemanticsNode().boundsInRoot.top)
+        compose.onNodeWithContentDescription("当前使用").assertIsDisplayed()
+        compose.onAllNodesWithText("当前使用").assertCountEquals(1)
+        compose.onAllNodesWithText("已停用").assertCountEquals(1)
+        compose.onNodeWithText("用药时长").performClick()
+        org.junit.Assert.assertTrue(compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot.top < compose.onNodeWithText("A停用药").fetchSemanticsNode().boundsInRoot.top)
+    }
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
         compose.onNodeWithContentDescription("添加卡片").performClick()
         compose.onNodeWithText("保存").performClick()

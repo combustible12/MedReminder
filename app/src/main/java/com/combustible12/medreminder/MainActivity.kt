@@ -319,21 +319,24 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
 private fun MedicineLibrary(state: Notebook, open: (Medicine) -> Unit, image: (String) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var filter by rememberSaveable { mutableIntStateOf(0) }
+    val activeMedicineIds = state.periods.filter { it.active }.mapTo(mutableSetOf()) { it.medicineId }
     Column(Modifier.padding(horizontal = 18.dp)) {
         SoftTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("搜索药品名称") }, leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Quiet) }, singleLine = true, shape = RoundedCornerShape(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 5.dp)) {
             listOf("全部", "当前使用", "已停用").forEachIndexed { i, text -> FilterChip(border = null, selected = filter == i, onClick = { filter = i }, label = { Text(text) }) }
         }
-        val meds = state.medicines.filter { med -> med.name.contains(query, ignoreCase = true) && when (filter) { 1 -> state.periods.any { it.medicineId == med.id && it.active }; 2 -> state.periods.none { it.medicineId == med.id && it.active }; else -> true } }
+        val meds = state.medicines.filter { med -> med.name.contains(query, ignoreCase = true) && when (filter) { 1 -> med.id in activeMedicineIds; 2 -> med.id !in activeMedicineIds; else -> true } }.sortedByDescending { it.id in activeMedicineIds }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(4.5.dp), contentPadding = PaddingValues(bottom = 10.dp)) {
             if (meds.isEmpty()) item { Text("暂无药品记录", color = Quiet, modifier = Modifier.padding(vertical = 20.dp)) }
             items(meds, key = { it.id }) { med ->
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).clickable { open(med) }.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            if (med.id in activeMedicineIds) Box(Modifier.size(7.dp).clip(CircleShape).background(Color(0xFF55A971)).semantics { contentDescription = "当前使用" })
+                            Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                        }
                         if (med.usageLine().isNotBlank()) Text(med.usageLine(), color = Quiet, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(if (state.periods.any { it.medicineId == med.id && it.active }) "当前使用" else "已停用", color = Quiet, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     }
                     med.image?.let { path -> AsyncImage(File(path), "查看图片", Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).clickable { image(path) }, contentScale = ContentScale.Crop) }
                 }
@@ -356,7 +359,8 @@ private fun MedicineDetail(med: Medicine, image: (String) -> Unit, edit: () -> U
 @Composable
 private fun MedicationDurationPage(state: Notebook, period: (UsePeriod) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
-    val medicines = state.medicines.filter { it.name.contains(query, ignoreCase = true) }
+    val activeMedicineIds = state.periods.filter { it.active }.mapTo(mutableSetOf()) { it.medicineId }
+    val medicines = state.medicines.filter { it.name.contains(query, ignoreCase = true) }.sortedByDescending { it.id in activeMedicineIds }
     Column(Modifier.padding(horizontal = 18.dp)) {
         SoftTextField(query, { query = it }, Modifier.fillMaxWidth(), placeholder = { Text("搜索药品名称") }, leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Quiet) }, singleLine = true, shape = RoundedCornerShape(18.dp))
         Spacer(Modifier.height(7.dp))
@@ -365,14 +369,14 @@ private fun MedicationDurationPage(state: Notebook, period: (UsePeriod) -> Unit)
             items(medicines, key = { it.id }) { med ->
                 val periods = state.periods.filter { it.medicineId == med.id }.sortedWith(compareByDescending<UsePeriod> { it.active }.thenByDescending { it.start ?: "" }.thenByDescending { it.id })
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color(0xFFF6F7FA)).padding(horizontal = 15.dp, vertical = 11.dp)) {
-                    Text(med.name + if (med.starred) " ⭐" else "", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+                    Text(med.name + if (med.starred) " ⭐" else "", color = Quiet, fontWeight = FontWeight.Normal, fontSize = 17.sp)
                     if (periods.isEmpty()) Text("暂无记录", color = Quiet, fontSize = 13.sp, modifier = Modifier.padding(vertical = 7.dp))
                     periods.forEachIndexed { index, value ->
                         if (index > 0) HorizontalDivider(color = Color(0xFFE5E7EC))
                         Row(Modifier.fillMaxWidth().clickable { period(value) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(value.start ?: "未填", Modifier.weight(.38f), fontSize = 13.sp, maxLines = 1)
-                            Text(if (value.active) "至今" else value.end ?: "未填", Modifier.weight(.38f), fontSize = 13.sp, maxLines = 1)
-                            Text(value.durationDays()?.let { "${it}天" } ?: "—", Modifier.weight(.24f), fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1)
+                            Text(value.start ?: "未填", Modifier.weight(.38f), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(if (value.active) "至今" else value.end ?: "未填", Modifier.weight(.38f), fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(value.durationDays()?.let { "${it}天" } ?: "—", Modifier.weight(.24f), fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1)
                         }
                     }
                     TextButton(onClick = { period(UsePeriod(medicineId = med.id, active = false)) }, contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)) { Text("＋ 添加使用记录", fontSize = 13.sp) }
