@@ -158,6 +158,66 @@ class UiTest {
         compose.onNodeWithText("便签").performClick()
         compose.onNodeWithText("联动停用测试药").assertDoesNotExist()
     }
+    @Test fun libraryInactiveSwipeUseChoosesTwoNoteCardsAndStartsNewHistory() {
+        val repo = (compose.activity.application as MedApplication).repository
+        val medicineId = runBlocking {
+            repo.dao.insertCard(NoteCard(name = "早"))
+            repo.dao.insertCard(NoteCard(name = "中"))
+            repo.dao.insertCard(NoteCard(name = "晚"))
+            val id = repo.addMedicine(Medicine(name = "库内两次药", specification = "20mg", defaultDose = "1片", dailyFrequency = "2", mealTiming = "餐后"))
+            repo.dao.insertPeriod(UsePeriod(medicineId = id, start = "2026-01-01", end = "2026-01-10", active = false))
+            id
+        }
+        compose.onNodeWithText("药品库").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithContentDescription("药品条目：库内两次药").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("药品条目：库内两次药").performTouchInput { swipeLeft() }
+        compose.onNodeWithContentDescription("使用").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("停用").assertDoesNotExist()
+        compose.onNodeWithText("选择服用卡片").assertIsDisplayed()
+        compose.onNodeWithText("早").performClick()
+        compose.onNodeWithText("晚").performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil(5000) { runBlocking { repo.dao.medicinePeriods(medicineId).any { it.active } } }
+        runBlocking {
+            val periods = repo.dao.medicinePeriods(medicineId)
+            org.junit.Assert.assertEquals(2, periods.size)
+            org.junit.Assert.assertEquals("2026-01-10", periods.first { !it.active }.end)
+            val groups = repo.dao.groups().first()
+            val assigned = repo.dao.itemsForMedicine(medicineId).mapNotNull { entry -> groups.firstOrNull { it.id == entry.groupId } }
+            org.junit.Assert.assertEquals(setOf("早", "晚"), assigned.mapNotNull { group -> repo.dao.cards().first().firstOrNull { it.id == group.cardId }?.name }.toSet())
+            org.junit.Assert.assertTrue(assigned.all { it.name == "餐后" })
+        }
+        compose.onNodeWithText("库内两次药").assertIsDisplayed()
+        compose.onNodeWithContentDescription("当前使用").assertIsDisplayed()
+        compose.onNodeWithContentDescription("药品条目：库内两次药").performTouchInput { swipeLeft() }
+        compose.onNodeWithContentDescription("停用").assertIsDisplayed()
+        compose.onNodeWithContentDescription("使用").assertDoesNotExist()
+    }
+
+    @Test fun libraryUseThreeTimesAutomaticallyAssignsMorningNoonEveningWithoutDuplicates() {
+        val repo = (compose.activity.application as MedApplication).repository
+        val medicineId = runBlocking {
+            repo.dao.insertCard(NoteCard(name = "早晨"))
+            repo.dao.insertCard(NoteCard(name = "中午"))
+            repo.dao.insertCard(NoteCard(name = "晚间"))
+            repo.addMedicine(Medicine(name = "库内三次药", dailyFrequency = "3", defaultDose = "2粒", mealTiming = "餐前"))
+        }
+        compose.onNodeWithText("药品库").performClick()
+        compose.onNodeWithContentDescription("药品条目：库内三次药").performTouchInput { swipeLeft() }
+        compose.onNodeWithContentDescription("使用").performClick()
+        compose.waitUntil(5000) { runBlocking { repo.dao.itemsForMedicine(medicineId).size == 3 } }
+        runBlocking {
+            val assigned = repo.dao.itemsForMedicine(medicineId)
+            org.junit.Assert.assertEquals(3, assigned.map { it.groupId }.distinct().size)
+            org.junit.Assert.assertEquals(1, repo.dao.medicinePeriods(medicineId).size)
+        }
+        // Only a new active period should be added; no repeated entries on a single card.
+        runBlocking {
+            org.junit.Assert.assertEquals(1, repo.dao.medicinePeriods(medicineId).count { it.active })
+            org.junit.Assert.assertTrue(repo.dao.itemsForMedicine(medicineId).all { it.dose == "2粒" })
+        }
+    }
+
     @Test fun createUnnamedCardAndOptionalTimeGroup() {
         compose.onNodeWithContentDescription("添加卡片").performClick()
         compose.onNodeWithText("保存").performClick()
