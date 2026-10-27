@@ -114,7 +114,7 @@ fun NotebookApp(app: MedApplication) {
     LaunchedEffect(state.reminders, permissionEpoch) { permissionProblem = app.scheduler.permissionProblem(); app.scheduler.scheduleAll() }
     BackHandler(detailId != null) { detailId = null }
     Scaffold(containerColor = Color.White, snackbarHost = { SnackbarHost(snack) },
-        topBar = { TopAppBar(title = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(if (detailId != null) "药品资料" else when (tab) { 0 -> "用药便签"; 1 -> "药品库"; else -> "用药时长" }, fontSize = 23.sp, fontWeight = FontWeight.SemiBold); if (tab == 0 && detailId == null) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AppUpdateButton(compact = true) } } }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
+        topBar = { TopAppBar(title = { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(if (detailId != null) "药品资料" else when (tab) { 0 -> "用药便签"; 1 -> "药品库"; else -> "用药时长" }, fontSize = 23.sp, fontWeight = FontWeight.SemiBold); if (detailId == null) Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { AppUpdateButton(compact = true) } } }, navigationIcon = { if (detailId != null) IconButton(onClick = { detailId = null }) { Icon(Icons.Outlined.ArrowBack, "返回") } }, actions = {
             if (tab == 0 && detailId == null) {
                 IconButton(onClick = { order = OrderEditor("排列卡片", state.cards.map { it.id to it.name.ifBlank { "未命名卡片" } }, repo::reorderCards) }) { Icon(Icons.Outlined.SwapVert, "调整卡片顺序", tint = Quiet) }
                 IconButton(onClick = { permissionSheet = true }) { Icon(Icons.Outlined.NotificationsNone, "提醒权限", tint = Quiet) }
@@ -125,7 +125,7 @@ fun NotebookApp(app: MedApplication) {
             NavigationBarItem(selected = tab == 1, onClick = { tab = 1; detailId = null }, icon = { Icon(Icons.Outlined.Inventory2, null) }, label = { Text("药品库") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             NavigationBarItem(selected = tab == 2, onClick = { tab = 2; detailId = null }, icon = { Icon(Icons.Outlined.History, null) }, label = { Text("用药时长") }, colors = NavigationBarItemDefaults.colors(indicatorColor = Color(0xFFF0F2F8)))
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                if (detailId == null && tab != 2) {
+                if (detailId == null) {
                     FilledIconButton(
                         onClick = {
                             if (tab == 0) cardEditor = NoteCard(color = state.cards.size % Colors.size)
