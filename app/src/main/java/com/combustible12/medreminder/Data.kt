@@ -239,22 +239,52 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
             3 -> automaticThreeDoseCards(cards) ?: throw IllegalArgumentException("请先准备名称含早/晨、中/午、晚/夜的三张卡片")
             else -> listOf(sourceGroup.cardId)
         }
+        scheduleMedicineOnCards(medId, dose.trim(), normalizedMealTiming.ifBlank { sourceGroup.name }, targetCardIds, cards)
+    }
+
+    // Both the notes editor and library's use action place medicines through this same
+    // group/entry creation routine; no parallel scheduling rules or duplicate entries.
+    private suspend fun scheduleMedicineOnCards(
+        medicineId: Long,
+        dose: String,
+        groupName: String,
+        targetCardIds: List<Long>,
+        cards: List<NoteCard>
+    ): List<Long> {
         val allGroups = dao.groups().first().toMutableList()
-        targetCardIds.map { cardId ->
+        val med = requireNotNull(dao.medicine(medicineId))
+        return targetCardIds.map { cardId ->
             require(cards.any { it.id == cardId }) { "所选卡片已被删除" }
-            val desiredName = normalizedMealTiming.ifBlank { sourceGroup.name }
-            val targetGroup = allGroups.firstOrNull { it.cardId == cardId && it.name.trim() == desiredName }
-                ?: NoteGroup(cardId = cardId, name = desiredName, position = dao.nextGroup(cardId)).let { newGroup ->
+            val targetGroup = allGroups.firstOrNull { it.cardId == cardId && it.name.trim() == groupName }
+                ?: NoteGroup(cardId = cardId, name = groupName, position = dao.nextGroup(cardId)).let { newGroup ->
                     val id = dao.insertGroup(newGroup)
                     dao.putReminder(Reminder(id))
                     newGroup.copy(id = id).also(allGroups::add)
                 }
-            val current = dao.groupItems(targetGroup.id).firstOrNull { it.medicineId == medId }
+            val current = dao.groupItems(targetGroup.id).firstOrNull { it.medicineId == medicineId }
             if (current != null) {
-                dao.updateItem(current.copy(dose = dose.trim(), starred = requireNotNull(dao.medicine(medId)).starred))
+                dao.updateItem(current.copy(dose = dose, starred = med.starred))
                 current.id
-            } else dao.insertItem(NoteItem(groupId = targetGroup.id, medicineId = medId, dose = dose.trim(), position = dao.nextItem(targetGroup.id), starred = requireNotNull(dao.medicine(medId)).starred))
+            } else dao.insertItem(NoteItem(groupId = targetGroup.id, medicineId = medicineId, dose = dose, position = dao.nextItem(targetGroup.id), starred = med.starred))
         }
+    }
+
+    suspend fun useLibraryMedicine(medicineId: Long, selectedCardIds: List<Long>) = db.withTransaction {
+        val medicine = requireNotNull(dao.medicine(medicineId)) { "药品已被删除" }
+        require(dao.medicinePeriods(medicineId).none { it.active }) { "药品已在使用中" }
+        val cards = dao.cards().first()
+        val targetCardIds = when (medicine.dailyFrequency.toIntOrNull()) {
+            1, 2 -> {
+                val required = medicine.dailyFrequency.toInt()
+                require(selectedCardIds.distinct().size == required) { "请选择$required 张服用卡片" }
+                selectedCardIds.distinct()
+            }
+            3 -> automaticThreeDoseCards(cards)
+                ?: throw IllegalArgumentException("请先准备名称含早/晨、中/午、晚/夜的三张卡片")
+            else -> throw IllegalArgumentException("请先在药品库设置每天1、2或3次的用药规则")
+        }
+        scheduleMedicineOnCards(medicine.id, medicine.defaultDose.trim(), medicine.mealTiming.ifBlank { "药品" }, targetCardIds, cards)
+        startUseIfNeeded(medicine.id)
     }
     suspend fun updateMedicine(value: Medicine) = db.withTransaction {
         require(value.name.isNotBlank()) { "请填写名称" }
@@ -290,12 +320,6 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
         if (dao.medicinePeriods(medicineId).none { it.active }) {
             dao.insertPeriod(UsePeriod(medicineId = medicineId, start = today().toString()))
         }
-    }
-    // Library "使用" reuses the same start-of-use logic as adding a medicine to a note.
-    // It does not decide which daily note or time group the medicine belongs to.
-    suspend fun beginMedicine(medicineId: Long) = db.withTransaction {
-        requireNotNull(dao.medicine(medicineId)) { "药品已被删除" }
-        startUseIfNeeded(medicineId)
     }
     private suspend fun endUseIfNoItems(medicineId: Long) {
         if (dao.itemCountForMedicine(medicineId) == 0) {
