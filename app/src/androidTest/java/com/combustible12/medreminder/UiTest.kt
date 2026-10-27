@@ -99,9 +99,9 @@ class UiTest {
         org.junit.Assert.assertTrue(compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot.top < compose.onNodeWithText("A停用药").fetchSemanticsNode().boundsInRoot.top)
         compose.onNodeWithContentDescription("当前使用").assertIsDisplayed()
         // The subtle active dot belongs to the specification row, not before the medicine name.
-        val statusBounds = compose.onNodeWithContentDescription("当前使用").fetchSemanticsNode().boundsInRoot
-        val nameBounds = compose.onNodeWithText("Z当前药").fetchSemanticsNode().boundsInRoot
-        val detailBounds = compose.onNodeWithText("20mg · 每次1片", substring = true).fetchSemanticsNode().boundsInRoot
+        val statusBounds = compose.onNodeWithContentDescription("当前使用", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val nameBounds = compose.onNodeWithText("Z当前药", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val detailBounds = compose.onNodeWithText("20mg · 每次1片", substring = true, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         org.junit.Assert.assertTrue("Status dot is below the medicine name", statusBounds.center.y > nameBounds.center.y)
         org.junit.Assert.assertTrue("Status dot is before the specification", statusBounds.right <= detailBounds.left)
         org.junit.Assert.assertEquals("Status dot and specification share a row", statusBounds.center.y, detailBounds.center.y, 3f)
