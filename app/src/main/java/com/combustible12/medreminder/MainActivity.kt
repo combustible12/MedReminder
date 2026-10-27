@@ -148,7 +148,11 @@ fun NotebookApp(app: MedApplication) {
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
                 )
                 if (detailId == null) {
-                    Box(Modifier.align(Alignment.Center)) { AppUpdateButton(compact = true) }
+                    Box(
+                        Modifier
+                            .align(Alignment.Center)
+                            .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                    ) { AppUpdateButton(compact = true) }
                 }
             }
         },

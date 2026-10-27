@@ -55,9 +55,12 @@ class UiTest {
     @Test fun addButtonFollowsCurrentModuleAndLibraryMedicineDoesNotEnterNotes() {
         compose.onNodeWithContentDescription("添加卡片").assertIsDisplayed()
         val noteUpdateX = compose.onNodeWithText("更新").fetchSemanticsNode().boundsInRoot.center.x
+        val noteUpdateY = compose.onNodeWithText("更新").fetchSemanticsNode().boundsInRoot.center.y
+        val noteTitleY = compose.onNodeWithText("用药便签").fetchSemanticsNode().boundsInRoot.center.y
         // Updates must be centered on the entire screen, not within the title's remaining space.
         val screenCenterX = compose.onRoot().fetchSemanticsNode().boundsInRoot.center.x
         org.junit.Assert.assertEquals(screenCenterX, noteUpdateX, 1f)
+        org.junit.Assert.assertEquals(noteTitleY, noteUpdateY, 1f)
         compose.onNodeWithText("药品库").performClick()
         compose.onNodeWithText("用药便签").assertDoesNotExist()
         compose.onNodeWithText("更新").assertIsDisplayed().assertHasClickAction()
