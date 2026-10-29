@@ -48,4 +48,57 @@ class SchedulePlacementTest {
             assertTrue(runCatching { repo.addMedicineSchedule(source, null, "选择不足", "", "1片", null, "", "2", "餐后", listOf(morning)) }.isFailure)
         } finally { app.database.clearAllTables() }
     }
+
+    @Test fun libraryUsePlacesOneDoseInChosenExistingGroupWithoutCreatingDefaultGroup() = runBlocking {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MedApplication
+        val repo = app.repository
+        app.database.clearAllTables()
+        try {
+            val card = repo.dao.insertCard(NoteCard(position = 0))
+            val before = repo.dao.insertGroup(NoteGroup(cardId = card, name = "餐前护肠胃", position = 0))
+            val after = repo.dao.insertGroup(NoteGroup(cardId = card, name = "餐后", position = 1))
+            val medicine = repo.dao.insertMedicine(Medicine(name = "B族维生素片", defaultDose = "1片", dailyFrequency = "1"))
+
+            repo.useLibraryMedicine(medicine, listOf(after))
+
+            val notebook = repo.notebook.first { it.items.size == 1 }
+            assertEquals(after, notebook.items.single().groupId)
+            assertTrue(notebook.groups.none { it.name == "药品" })
+            assertTrue(notebook.items.none { it.groupId == before })
+        } finally { app.database.clearAllTables() }
+    }
+
+    @Test fun libraryUseRequiresExactExistingGroupsAndDoesNotFallbackToNewGroup() = runBlocking {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MedApplication
+        val repo = app.repository
+        app.database.clearAllTables()
+        try {
+            val card = repo.dao.insertCard(NoteCard(position = 0))
+            val before = repo.dao.insertGroup(NoteGroup(cardId = card, name = "餐前", position = 0))
+            val medicine = repo.dao.insertMedicine(Medicine(name = "两次药", defaultDose = "1片", dailyFrequency = "2"))
+
+            assertTrue(runCatching { repo.useLibraryMedicine(medicine, listOf(before)) }.isFailure)
+            val notebook = repo.notebook.first()
+            assertTrue(notebook.items.isEmpty())
+            assertTrue(notebook.groups.none { it.name == "药品" })
+            assertTrue(notebook.periods.none { it.medicineId == medicine && it.active })
+        } finally { app.database.clearAllTables() }
+    }
+
+    @Test fun libraryThreeDoseWithoutMealTimingDoesNotCreateDefaultGroups() = runBlocking {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as MedApplication
+        val repo = app.repository
+        app.database.clearAllTables()
+        try {
+            repo.dao.insertCard(NoteCard(name = "早晨", position = 0))
+            repo.dao.insertCard(NoteCard(name = "中午", position = 1))
+            repo.dao.insertCard(NoteCard(name = "晚间", position = 2))
+            val medicine = repo.dao.insertMedicine(Medicine(name = "三次药", defaultDose = "1片", dailyFrequency = "3"))
+
+            assertTrue(runCatching { repo.useLibraryMedicine(medicine, emptyList()) }.isFailure)
+            val notebook = repo.notebook.first()
+            assertTrue(notebook.items.isEmpty())
+            assertTrue(notebook.groups.none { it.name == "药品" })
+        } finally { app.database.clearAllTables() }
+    }
 }

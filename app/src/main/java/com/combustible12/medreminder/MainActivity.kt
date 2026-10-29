@@ -271,21 +271,21 @@ fun NotebookApp(app: MedApplication) {
     libraryUseMedicine?.let { med ->
         val required = med.dailyFrequency.toIntOrNull()
         if (required == 1 || required == 2) {
-            var chosenCardIds by remember(med.id) { mutableStateOf(emptySet<Long>()) }
+            var chosenGroupIds by remember(med.id) { mutableStateOf(emptySet<Long>()) }
             AlertDialog(
                 onDismissRequest = { libraryUseMedicine = null },
-                title = { Text("选择服用卡片") },
+                title = { Text("选择服用大类") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("${med.name} · 一天${required}次（请选择${required}张卡片）", fontSize = 13.sp, color = Quiet)
-                        MedicineCardChoices(state.cards, chosenCardIds, required) { chosenCardIds = it }
+                        Text("${med.name} · 一天${required}次（请选择${required}个现有大类）", fontSize = 13.sp, color = Quiet)
+                        MedicineGroupChoices(state, chosenGroupIds, required) { chosenGroupIds = it }
                     }
                 },
                 confirmButton = {
                     TextButton(
-                        enabled = chosenCardIds.size == required && !busy,
+                        enabled = chosenGroupIds.size == required && !busy,
                         onClick = {
-                            val ids = chosenCardIds.toList()
+                            val ids = chosenGroupIds.toList()
                             perform {
                                 repo.useLibraryMedicine(med.id, ids)
                                 app.scheduler.scheduleAll()
@@ -601,6 +601,37 @@ private fun MedicineCardChoices(cards: List<NoteCard>, selectedCardIds: Set<Long
                     onChange(if (selectedCard) selectedCardIds - card.id else if (selectedCardIds.size < required) selectedCardIds + card.id else selectedCardIds)
                 },
                 label = { Text(card.name.ifBlank { "未命名卡片" }) },
+                border = null
+            )
+        }
+    }
+}
+
+@Composable
+private fun MedicineGroupChoices(state: Notebook, selectedGroupIds: Set<Long>, required: Int, onChange: (Set<Long>) -> Unit) {
+    val orderedCards = state.cards.sortedWith(compareBy<NoteCard> { it.position }.thenBy { it.id })
+    val cardOrder = orderedCards.mapIndexed { index, card -> card.id to index }.toMap()
+    val groups = state.groups.sortedWith(
+        compareBy<NoteGroup> { cardOrder[it.cardId] ?: Int.MAX_VALUE }
+            .thenBy { it.position }
+            .thenBy { it.id }
+    )
+    if (groups.isEmpty()) {
+        Text("请先在便签中添加大类", color = Quiet, fontSize = 13.sp)
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        groups.forEach { group ->
+            val card = orderedCards.firstOrNull { it.id == group.cardId }
+            val cardLabel = card?.name?.trim().orEmpty()
+            val label = if (cardLabel.isBlank()) group.name else "$cardLabel · ${group.name}"
+            val selected = group.id in selectedGroupIds
+            FilterChip(
+                selected = selected,
+                onClick = {
+                    onChange(if (selected) selectedGroupIds - group.id else if (selectedGroupIds.size < required) selectedGroupIds + group.id else selectedGroupIds)
+                },
+                label = { Text(label) },
                 border = null
             )
         }

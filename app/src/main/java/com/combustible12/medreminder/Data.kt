@@ -252,8 +252,7 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
         cards: List<NoteCard>
     ): List<Long> {
         val allGroups = dao.groups().first().toMutableList()
-        val med = requireNotNull(dao.medicine(medicineId))
-        return targetCardIds.map { cardId ->
+        val targetGroupIds = targetCardIds.map { cardId ->
             require(cards.any { it.id == cardId }) { "所选卡片已被删除" }
             val targetGroup = allGroups.firstOrNull { it.cardId == cardId && it.name.trim() == groupName }
                 ?: NoteGroup(cardId = cardId, name = groupName, position = dao.nextGroup(cardId)).let { newGroup ->
@@ -261,29 +260,46 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
                     dao.putReminder(Reminder(id))
                     newGroup.copy(id = id).also(allGroups::add)
                 }
-            val current = dao.groupItems(targetGroup.id).firstOrNull { it.medicineId == medicineId }
+            targetGroup.id
+        }
+        return scheduleMedicineInGroups(medicineId, dose, targetGroupIds)
+    }
+
+    private suspend fun scheduleMedicineInGroups(
+        medicineId: Long,
+        dose: String,
+        targetGroupIds: List<Long>
+    ): List<Long> {
+        val med = requireNotNull(dao.medicine(medicineId))
+        return targetGroupIds.map { groupId ->
+            requireNotNull(dao.group(groupId)) { "所选大类已被删除" }
+            val current = dao.groupItems(groupId).firstOrNull { it.medicineId == medicineId }
             if (current != null) {
                 dao.updateItem(current.copy(dose = dose, starred = med.starred))
                 current.id
-            } else dao.insertItem(NoteItem(groupId = targetGroup.id, medicineId = medicineId, dose = dose, position = dao.nextItem(targetGroup.id), starred = med.starred))
+            } else dao.insertItem(NoteItem(groupId = groupId, medicineId = medicineId, dose = dose, position = dao.nextItem(groupId), starred = med.starred))
         }
     }
 
-    suspend fun useLibraryMedicine(medicineId: Long, selectedCardIds: List<Long>) = db.withTransaction {
+    suspend fun useLibraryMedicine(medicineId: Long, selectedGroupIds: List<Long>) = db.withTransaction {
         val medicine = requireNotNull(dao.medicine(medicineId)) { "药品已被删除" }
         require(dao.medicinePeriods(medicineId).none { it.active }) { "药品已在使用中" }
         val cards = dao.cards().first()
-        val targetCardIds = when (medicine.dailyFrequency.toIntOrNull()) {
+        when (medicine.dailyFrequency.toIntOrNull()) {
             1, 2 -> {
                 val required = medicine.dailyFrequency.toInt()
-                require(selectedCardIds.distinct().size == required) { "请选择$required 张服用卡片" }
-                selectedCardIds.distinct()
+                val targetGroupIds = selectedGroupIds.distinct()
+                require(targetGroupIds.size == required) { "请选择$required 个服用大类" }
+                scheduleMedicineInGroups(medicine.id, medicine.defaultDose.trim(), targetGroupIds)
             }
-            3 -> automaticThreeDoseCards(cards)
-                ?: throw IllegalArgumentException("请先准备名称含早/晨、中/午、晚/夜的三张卡片")
+            3 -> {
+                require(medicine.mealTiming.isNotBlank()) { "请先在药品资料中设置餐前或餐后" }
+                val targetCardIds = automaticThreeDoseCards(cards)
+                    ?: throw IllegalArgumentException("请先准备名称含早/晨、中/午、晚/夜的三张卡片")
+                scheduleMedicineOnCards(medicine.id, medicine.defaultDose.trim(), medicine.mealTiming, targetCardIds, cards)
+            }
             else -> throw IllegalArgumentException("请先在药品库设置每天1、2或3次的用药规则")
         }
-        scheduleMedicineOnCards(medicine.id, medicine.defaultDose.trim(), medicine.mealTiming.ifBlank { "药品" }, targetCardIds, cards)
         startUseIfNeeded(medicine.id)
     }
     suspend fun updateMedicine(value: Medicine) = db.withTransaction {
