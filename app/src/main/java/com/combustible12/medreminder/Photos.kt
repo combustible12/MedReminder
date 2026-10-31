@@ -63,7 +63,7 @@ internal fun PhotoEditor(paths: List<String>, loading: Boolean, editable: Boolea
     var viewing by remember { mutableStateOf<String?>(null) }
     if (paths.isNotEmpty()) PhotoStrip(paths, { viewing = it }, if (editable && !loading) remove else null)
     if (editable) TextButton(onClick = add, enabled = !loading) {
-        Text(if (loading) "正在保存图片…" else if (paths.isEmpty()) "添加图片（可多选，可不填）" else "继续添加图片")
+        Text(if (loading) "正在读取图片…" else if (paths.isEmpty()) "添加图片（可多选，可不填）" else "继续添加图片")
     }
     viewing?.let { path ->
         if (path in paths) PhotoViewer(paths, paths.indexOf(path)) { viewing = null }
