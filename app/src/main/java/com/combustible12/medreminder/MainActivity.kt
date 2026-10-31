@@ -391,8 +391,8 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                     .fillMaxWidth()
                                     .clickable { editItem(item) }
                                     .padding(
-                                        top = if (index == 0) 6.dp else if (previousIsDivider) 0.75.dp else 3.dp,
-                                        bottom = if (index == groupItems.lastIndex) 0.25.dp else if (nextIsDivider) 0.75.dp else 3.dp
+                                        top = if (index == 0) 6.dp else if (previousIsDivider) 0.5.dp else 3.dp,
+                                        bottom = if (index == groupItems.lastIndex) 0.25.dp else if (nextIsDivider) 0.5.dp else 3.dp
                                     )
                                     .heightIn(min = 22.5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -409,7 +409,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                 }
                             }
                             }
-                            Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else if (nextIsDivider) 0.25.dp else 0.5.dp))
+                            Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else if (nextIsDivider) 0.dp else 0.5.dp))
                         }
                     }
                     }
