@@ -175,12 +175,13 @@ fun automaticThreeDoseCards(cards: List<NoteCard>): List<Long>? {
 class Repository(val db: MedDatabase, private val today: () -> LocalDate = LocalDate::now) {
     val dao = db.dao()
     val notebook = combine(dao.cards(), dao.groups(), dao.items(), dao.medicines(), dao.periods()) { c, g, i, m, p -> Notebook(c, g, i, m, p) }.combine(dao.reminders()) { n, r -> n.copy(reminders = r) }.combine(dao.dividers()) { n, d -> n.copy(dividers = d) }
-    suspend fun saveCard(value: NoteCard) = db.withTransaction {
+    suspend fun saveCard(value: NoteCard): Unit = db.withTransaction {
         if (value.id == 0L) dao.insertCard(value.copy(position = dao.nextCard()))
         else {
             requireNotNull(dao.card(value.id)) { "卡片已被删除" }
             dao.updateCard(value)
         }
+        Unit
     }
     suspend fun saveGroup(value: NoteGroup, reminder: Reminder): Long = db.withTransaction {
         val id = if (value.id == 0L) dao.insertGroup(value.copy(position = dao.nextGroup(value.cardId))) else { dao.updateGroup(value); value.id }
@@ -429,9 +430,29 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
         val rest = entries.filterNot { it == id }
         reorderEntries(item.groupId, if (top) listOf(id) + rest else rest + id)
     }
-    suspend fun reorderCards(ids: List<Long>) = db.withTransaction { ids.forEachIndexed { p, id -> dao.card(id)?.let { dao.updateCard(it.copy(position = p)) } } }
-    suspend fun reorderGroups(ids: List<Long>) = db.withTransaction { ids.forEachIndexed { p, id -> dao.group(id)?.let { dao.updateGroup(it.copy(position = p)) } } }
-    suspend fun reorderItems(ids: List<Long>) = db.withTransaction { ids.forEachIndexed { p, id -> dao.item(id)?.let { dao.updateItem(it.copy(position = p)) } } }
+    suspend fun reorderCards(ids: List<Long>) = db.withTransaction {
+        val cards = dao.cards().first()
+        require(ids.size == ids.distinct().size && ids.toSet() == cards.map { it.id }.toSet()) { "卡片列表已变化，请重新打开排序" }
+        ids.forEachIndexed { position, id -> dao.updateCard(requireNotNull(cards.firstOrNull { it.id == id }).copy(position = position)) }
+    }
+    suspend fun reorderGroups(ids: List<Long>) = db.withTransaction {
+        require(ids.isNotEmpty()) { "没有可排序的大类" }
+        val selected = ids.map { id -> requireNotNull(dao.group(id)) { "大类列表已变化，请重新打开排序" } }
+        val cardId = selected.map { it.cardId }.distinct().singleOrNull()
+            ?: throw IllegalArgumentException("只能排列同一卡片中的大类")
+        val current = dao.groups().first().filter { it.cardId == cardId }
+        require(ids.size == ids.distinct().size && ids.toSet() == current.map { it.id }.toSet()) { "大类列表已变化，请重新打开排序" }
+        ids.forEachIndexed { position, id -> dao.updateGroup(requireNotNull(current.firstOrNull { it.id == id }).copy(position = position)) }
+    }
+    suspend fun reorderItems(ids: List<Long>) = db.withTransaction {
+        require(ids.isNotEmpty()) { "没有可排序的药品" }
+        val selected = ids.map { id -> requireNotNull(dao.item(id)) { "药品列表已变化，请重新打开排序" } }
+        val groupId = selected.map { it.groupId }.distinct().singleOrNull()
+            ?: throw IllegalArgumentException("只能排列同一大类中的药品")
+        val current = dao.groupItems(groupId)
+        require(ids.size == ids.distinct().size && ids.toSet() == current.map { it.id }.toSet()) { "药品列表已变化，请重新打开排序" }
+        ids.forEachIndexed { position, id -> dao.updateItem(requireNotNull(current.firstOrNull { it.id == id }).copy(position = position)) }
+    }
 }
 
 class ImageStore(private val context: Context) {
