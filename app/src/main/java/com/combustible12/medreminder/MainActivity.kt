@@ -253,7 +253,7 @@ fun NotebookApp(app: MedApplication) {
     groupEditor?.let { editor ->
         val operationKey = "group:${editor.group?.id ?: "new-${editor.cardId}"}:save"
         GroupDialog(editor, state.reminders.firstOrNull { it.groupId == editor.group?.id }, operations.isRunning(operationKey), { groupEditor = null }, { updated, reminder ->
-            perform(operationKey) { val id = repo.saveGroup(updated, reminder); app.scheduler.schedule(id)?.let { snack.showSnackbar(it) }; groupEditor = null }
+            perform(operationKey) { val id = repo.saveGroup(updated, reminder); val warning = app.scheduler.schedule(id); groupEditor = null; warning?.let { snack.showSnackbar(it) } }
         }, {
         val g = editor.group ?: return@GroupDialog
         confirm = Confirmation("删除大类？", "取消此大类提醒并删除便签安排；不再出现在其他便签中的药品将自动记录停药日期。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.removeNoteGroup(g.id) }; groupEditor = null }
