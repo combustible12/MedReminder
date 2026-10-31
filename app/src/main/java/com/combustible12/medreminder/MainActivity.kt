@@ -374,7 +374,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         val entry = groupItems.first { it.key == entryKey }
                         val divider = entry.divider
                         if (divider != null) {
-                            Row(Modifier.fillMaxWidth().clickable { editDivider(divider) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(Modifier.fillMaxWidth().clickable { editDivider(divider) }.padding(vertical = 2.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = .4f))
                                 Text(divider.text, color = accent, fontSize = 12.sp, modifier = Modifier.widthIn(max = 180.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                 HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = .4f))
@@ -391,8 +391,8 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                     .fillMaxWidth()
                                     .clickable { editItem(item) }
                                     .padding(
-                                        top = if (index == 0) 6.dp else if (previousIsDivider) 1.5.dp else 3.dp,
-                                        bottom = if (index == groupItems.lastIndex) 6.dp else if (nextIsDivider) 1.5.dp else 3.dp
+                                        top = if (index == 0) 6.dp else if (previousIsDivider) 0.75.dp else 3.dp,
+                                        bottom = if (index == groupItems.lastIndex) 6.dp else if (nextIsDivider) 0.75.dp else 3.dp
                                     )
                                     .heightIn(min = 22.5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -409,7 +409,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                 }
                             }
                             }
-                            Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else 0.5.dp))
+                            Spacer(Modifier.height(if (index == groupItems.lastIndex) 1.dp else if (nextIsDivider) 0.25.dp else 0.5.dp))
                         }
                     }
                     }
