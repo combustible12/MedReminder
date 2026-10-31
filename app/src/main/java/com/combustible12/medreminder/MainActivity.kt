@@ -374,7 +374,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         val entry = groupItems.first { it.key == entryKey }
                         val divider = entry.divider
                         if (divider != null) {
-                            Row(Modifier.fillMaxWidth().clickable { editDivider(divider) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(Modifier.fillMaxWidth().clickable { editDivider(divider) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = .4f))
                                 Text(divider.text, color = accent, fontSize = 12.sp, modifier = Modifier.widthIn(max = 180.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                 HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = .4f))
