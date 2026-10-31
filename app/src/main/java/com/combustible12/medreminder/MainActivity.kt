@@ -405,8 +405,8 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                     .fillMaxWidth()
                                     .clickable { editItem(item) }
                                     .padding(
-                                        top = if (index == 0) 6.dp else if (previousIsDivider) 6.5.dp else 3.dp,
-                                        bottom = if (index == groupItems.lastIndex) 0.25.dp else if (nextIsDivider) 6.5.dp else 3.dp
+                                        top = if (index == 0) 6.dp else if (previousIsDivider) 5.dp else 3.dp,
+                                        bottom = if (index == groupItems.lastIndex) 0.25.dp else if (nextIsDivider) 5.dp else 3.dp
                                     )
                                     .heightIn(min = 22.5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
