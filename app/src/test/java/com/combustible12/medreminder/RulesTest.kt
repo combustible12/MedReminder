@@ -54,6 +54,9 @@ class RulesTest {
         assertFalse(source.contains("if (busy) return"))
         assertFalse(source.contains("&& !busy"))
         assertFalse(source.contains("else if (!loading) save("))
+        assertTrue(source.contains("OperationRegistry()"))
+        assertTrue(source.contains("operations.run(key, action)"))
+        assertFalse(source.contains("repo.dao.delete"))
         assertTrue(source.contains("operationError = e.message"))
         assertTrue(source.contains("图片正在读取，请稍后"))
     }
