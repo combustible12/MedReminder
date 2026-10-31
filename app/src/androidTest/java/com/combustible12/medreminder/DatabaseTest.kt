@@ -174,4 +174,30 @@ class DatabaseTest {
         }
     }
 
+    @Test fun staleOrCrossParentReorderIsRejectedWithoutPartialWrites() = runBlocking<Unit> {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val filename = "safe-reorder-${System.nanoTime()}.db"
+        val db = Room.databaseBuilder(context, MedDatabase::class.java, filename).build()
+        try {
+            val repo = Repository(db)
+            val firstCard = repo.dao.insertCard(NoteCard(name = "早"))
+            val secondCard = repo.dao.insertCard(NoteCard(name = "晚"))
+            assertTrue(runCatching { repo.reorderCards(listOf(firstCard)) }.isFailure)
+            assertEquals(listOf(firstCard, secondCard), repo.dao.cards().first().map { it.id })
+
+            val firstGroup = repo.saveGroup(NoteGroup(cardId = firstCard, name = "餐前"), Reminder(0))
+            val secondGroup = repo.saveGroup(NoteGroup(cardId = firstCard, name = "餐后"), Reminder(0))
+            val otherCardGroup = repo.saveGroup(NoteGroup(cardId = secondCard, name = "餐前"), Reminder(0))
+            assertTrue(runCatching { repo.reorderGroups(listOf(firstGroup, otherCardGroup)) }.isFailure)
+            assertEquals(listOf(firstGroup, secondGroup), repo.dao.groups().first().filter { it.cardId == firstCard }.map { it.id })
+
+            repo.reorderGroups(listOf(secondGroup, firstGroup))
+            assertEquals(listOf(secondGroup, firstGroup), repo.dao.groups().first().filter { it.cardId == firstCard }.map { it.id })
+            Unit
+        } finally {
+            db.close()
+            context.deleteDatabase(filename)
+        }
+    }
+
 }
