@@ -46,4 +46,16 @@ class RulesTest {
     }
     @Test fun optionalDatesAndMultiplePeriods() { validateDates(null, null); validateDates("2026-09-01", "2026-09-15") }
     @Test(expected = IllegalArgumentException::class) fun reversedDatesRejected() { validateDates("2026-10-20", "2026-10-19") }
+    @Test fun actionsAreNeverSilentlyDroppedBySharedBusyState() {
+        val source = listOf(
+            java.io.File("src/main/java/com/combustible12/medreminder/MainActivity.kt"),
+            java.io.File("app/src/main/java/com/combustible12/medreminder/MainActivity.kt")
+        ).first { it.isFile }.readText()
+        assertFalse(source.contains("if (busy) return"))
+        assertFalse(source.contains("&& !busy"))
+        assertFalse(source.contains("else if (!loading) save("))
+        assertTrue(source.contains("operationError = e.message"))
+        assertTrue(source.contains("图片正在读取，请稍后"))
+    }
+
 }
