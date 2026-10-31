@@ -144,4 +144,34 @@ class DatabaseTest {
             Unit
         } finally { db.close(); context.deleteDatabase(filename) }
     }
+    @Test fun repositoryOwnsArchiveDividerAndPeriodDeletion() = runBlocking<Unit> {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val filename = "repository-delete-${System.nanoTime()}.db"
+        val db = Room.databaseBuilder(context, MedDatabase::class.java, filename).build()
+        try {
+            val repo = Repository(db)
+            val card = repo.dao.insertCard(NoteCard(name = "早"))
+            val group = repo.saveGroup(NoteGroup(cardId = card, name = "餐前"), Reminder(0))
+            val divider = repo.saveDivider(NoteDivider(groupId = group, text = "30分钟"))
+            val item = repo.saveItem(group, null, null, "删除测试药", "10mg", "1片", "/saved/image")
+            val medicineId = requireNotNull(repo.dao.item(item)).medicineId
+            val oldPeriod = repo.dao.insertPeriod(UsePeriod(medicineId = medicineId, start = "2026-01-01", end = "2026-01-02", active = false))
+
+            repo.deleteDivider(divider)
+            assertNull(repo.dao.divider(divider))
+            repo.deletePeriod(oldPeriod)
+            assertTrue(repo.dao.medicinePeriods(medicineId).none { it.id == oldPeriod })
+
+            val deleted = repo.deleteMedicineArchive(medicineId)
+            assertEquals(listOf("/saved/image"), deleted.images)
+            assertEquals(listOf(group), deleted.affectedGroupIds)
+            assertNull(repo.dao.medicine(medicineId))
+            assertTrue(repo.dao.itemsForMedicine(medicineId).isEmpty())
+            Unit
+        } finally {
+            db.close()
+            context.deleteDatabase(filename)
+        }
+    }
+
 }
