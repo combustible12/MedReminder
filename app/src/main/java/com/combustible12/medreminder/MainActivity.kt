@@ -392,7 +392,7 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                                     .clickable { editItem(item) }
                                     .padding(
                                         top = if (index == 0) 6.dp else if (previousIsDivider) 0.75.dp else 3.dp,
-                                        bottom = if (index == groupItems.lastIndex) 6.dp else if (nextIsDivider) 0.75.dp else 3.dp
+                                        bottom = if (index == groupItems.lastIndex) 0.25.dp else if (nextIsDivider) 0.75.dp else 3.dp
                                     )
                                     .heightIn(min = 22.5.dp),
                                 verticalAlignment = Alignment.CenterVertically,
