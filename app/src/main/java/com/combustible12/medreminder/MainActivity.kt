@@ -104,8 +104,13 @@ fun NotebookApp(app: MedApplication) {
     var permissionProblem by remember { mutableStateOf(app.scheduler.permissionProblem()) }
     var permissionEpoch by remember { mutableIntStateOf(0) }
     val owner = LocalLifecycleOwner.current
-    var busy by remember { mutableStateOf(false) }
-    fun perform(action: suspend () -> Unit) { if (busy) return; busy = true; scope.launch { try { action() } catch (e: Exception) { snack.showSnackbar(e.message ?: "保存失败，请重试") } finally { busy = false } } }
+    var operationError by remember { mutableStateOf<String?>(null) }
+    fun perform(action: suspend () -> Unit) {
+        scope.launch {
+            try { action() }
+            catch (e: Exception) { operationError = e.message ?: "操作失败，请重试" }
+        }
+    }
     fun refreshPermissions() { permissionEpoch++; permissionProblem = app.scheduler.permissionProblem(); scope.launch { app.scheduler.scheduleAll() } }
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { refreshPermissions() }
     DisposableEffect(owner) {
@@ -293,7 +298,7 @@ fun NotebookApp(app: MedApplication) {
                 },
                 confirmButton = {
                     TextButton(
-                        enabled = chosenGroupIds.size == required && !busy,
+                        enabled = chosenGroupIds.size == required,
                         onClick = {
                             val ids = chosenGroupIds.toList()
                             perform {
@@ -309,6 +314,14 @@ fun NotebookApp(app: MedApplication) {
         }
     }
     periodEditor?.let { period -> PeriodDialog(period, { periodEditor = null }, { updated -> perform { repo.savePeriod(updated); periodEditor = null } }, { confirm = Confirmation("删除这段使用记录？", "只删除这段日期记录，不删除药品和首页安排。") { repo.dao.deletePeriod(period.id); periodEditor = null } }) }
+    operationError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { operationError = null },
+            title = { Text("操作失败") },
+            text = { Text(message) },
+            confirmButton = { TextButton(onClick = { operationError = null }) { Text("知道了") } }
+        )
+    }
     confirm?.let { c -> AlertDialog(onDismissRequest = { confirm = null }, title = { Text(c.title) }, text = { Text(c.text) }, confirmButton = { TextButton(onClick = { confirm = null; perform(c.action) }) { Text(c.confirmLabel, color = Color(0xFFB56F71)) } }, dismissButton = { TextButton(onClick = { confirm = null }) { Text("取消") } }) }
     order?.let { o -> OrderDialog(o, { order = null }) { ids -> perform { o.save(ids); order = null } } }
     fullImage?.let { path ->
@@ -689,7 +702,7 @@ private fun MedicineDialog(med: Medicine, app: MedApplication, dismiss: () -> Un
     val imported = remember { mutableListOf<String>() }
     DisposableEffect(Unit) { onDispose { app.scope.launch { imported.forEach { ImageStore(app).removeIfUnused(it, app.database) } } } }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> if (uris.isNotEmpty()) scope.launch { loading = true; try { for (uri in uris) { val path = ImageStore(app).import(uri).also { imported.add(it) }; images = images + path } } catch (e: Exception) { error = e.message ?: "图片读取失败" } finally { loading = false } } }
-    EditorDialog(if (med.id == 0L) "添加药品" else "编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (!loading) save(med.copy(name = name, specification = spec, defaultDose = dose, dailyFrequency = frequency, mealTiming = mealTiming, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
+    EditorDialog(if (med.id == 0L) "添加药品" else "编辑药品资料", dismiss, { if (name.isBlank()) error = "请填写名称" else if (loading) error = "图片正在读取，请稍后" else save(med.copy(name = name, specification = spec, defaultDose = dose, dailyFrequency = frequency, mealTiming = mealTiming, image = images.firstOrNull(), imagesJson = encodePhotos(images))) }) {
         Text("名称、规格和图片会同步用于引用此药品的首页条目。各条目的用量保持独立。", fontSize = 12.sp, color = Quiet)
         SoftTextField(name, { name = it }, label = { Text("药品名称") }, modifier = Modifier.fillMaxWidth())
         SoftTextField(spec, { spec = it }, label = { Text("规格（可不填）") }, modifier = Modifier.fillMaxWidth())
