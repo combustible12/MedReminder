@@ -91,6 +91,7 @@ fun NotebookApp(app: MedApplication) {
     var cardEditor by remember { mutableStateOf<NoteCard?>(null) }
     var groupEditor by remember { mutableStateOf<GroupEditor?>(null) }
     var dividerEditor by remember { mutableStateOf<NoteDivider?>(null) }
+    var dividerSaving by remember { mutableStateOf(false) }
     var itemEditor by remember { mutableStateOf<ItemEditor?>(null) }
     var detailId by rememberSaveable { mutableStateOf<Long?>(null) }
     var medicineEditor by remember { mutableStateOf<Medicine?>(null) }
@@ -243,7 +244,16 @@ fun NotebookApp(app: MedApplication) {
         val g = editor.group ?: return@GroupDialog
         confirm = Confirmation("删除大类？", "取消此大类提醒并删除便签安排；不再出现在其他便签中的药品将自动记录停药日期。") { ReminderScheduler.mutex.withLock { app.scheduler.cancel(g.id); repo.removeNoteGroup(g.id) }; groupEditor = null }
     }) }
-    dividerEditor?.let { divider -> DividerDialog(divider, { dividerEditor = null }, { text -> perform { repo.saveDivider(divider.copy(text = text)); dividerEditor = null } }, {
+    dividerEditor?.let { divider -> DividerDialog(divider, dividerSaving, { if (!dividerSaving) dividerEditor = null }, { text ->
+        if (!dividerSaving) {
+            dividerSaving = true
+            scope.launch {
+                try { repo.saveDivider(divider.copy(text = text)); dividerEditor = null }
+                catch (e: Exception) { snack.showSnackbar(e.message ?: "分隔条保存失败，请重试") }
+                finally { dividerSaving = false }
+            }
+        }
+    }, {
         confirm = Confirmation("删除分隔条？", "只删除这条分隔线，药品安排保留。") { repo.dao.deleteDivider(divider.id); dividerEditor = null }
     }) }
     itemEditor?.let { editor -> ItemDialog(editor, state, app, { itemEditor = null }, { selected, name, spec, dose, images, frequency, mealTiming, cardIds -> perform {
@@ -494,8 +504,8 @@ private fun MedicationDurationPage(state: Notebook, period: (UsePeriod) -> Unit)
 }
 
 @Composable
-private fun EditorDialog(title: String, dismiss: () -> Unit, save: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    AlertDialog(onDismissRequest = dismiss, title = { Text(title, fontSize = 20.sp) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp), content = content) }, confirmButton = { TextButton(onClick = save) { Text("保存") } }, dismissButton = { TextButton(onClick = dismiss) { Text("取消") } })
+private fun EditorDialog(title: String, dismiss: () -> Unit, save: () -> Unit, saveEnabled: Boolean = true, saveLabel: String = "保存", content: @Composable ColumnScope.() -> Unit) {
+    AlertDialog(onDismissRequest = dismiss, title = { Text(title, fontSize = 20.sp) }, text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp), content = content) }, confirmButton = { TextButton(onClick = save, enabled = saveEnabled) { Text(saveLabel) } }, dismissButton = { TextButton(onClick = dismiss, enabled = saveEnabled) { Text("取消") } })
 }
 
 @Composable
@@ -765,15 +775,15 @@ private fun OrderDialog(order: OrderEditor, dismiss: () -> Unit, save: (List<Lon
 }
 
 @Composable
-private fun DividerDialog(divider: NoteDivider, dismiss: () -> Unit, save: (String) -> Unit, delete: () -> Unit) {
+private fun DividerDialog(divider: NoteDivider, saving: Boolean, dismiss: () -> Unit, save: (String) -> Unit, delete: () -> Unit) {
     var text by remember(divider.id) { mutableStateOf(divider.text) }
     var error by remember { mutableStateOf(false) }
     EditorDialog(if (divider.id == 0L) "添加分隔条" else "编辑分隔条", dismiss, {
         if (text.isBlank()) error = true else save(text.trim())
-    }) {
+    }, saveEnabled = !saving, saveLabel = if (saving) "保存中…" else "保存") {
         SoftTextField(text, { text = it; error = false }, label = { Text("分隔文字") }, modifier = Modifier.fillMaxWidth(), isError = error)
         if (error) Text("请填写分隔文字", color = MaterialTheme.colorScheme.error)
-        if (divider.id != 0L) TextButton(onClick = delete) { Text("删除分隔条", color = Color(0xFFB56F71)) }
+        if (divider.id != 0L) TextButton(onClick = delete, enabled = !saving) { Text("删除分隔条", color = Color(0xFFB56F71)) }
     }
 }
 

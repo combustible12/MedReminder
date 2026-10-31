@@ -299,6 +299,10 @@ class UiTest {
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil(10000) { compose.onAllNodesWithText("添加分隔条").fetchSemanticsNodes().isEmpty() }
         compose.waitUntil(5000) { compose.onAllNodesWithText("1小时").fetchSemanticsNodes().isNotEmpty() }
+        runBlocking {
+            val repo = (compose.activity.application as MedApplication).repository
+            org.junit.Assert.assertEquals("1小时", repo.dao.dividers().first().single().text)
+        }
         compose.onNodeWithText("1小时").performClick()
         compose.onNodeWithText("分隔文字").performTextClearance()
         compose.onNodeWithText("分隔文字").performTextInput("间隔1小时")
