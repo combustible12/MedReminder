@@ -90,6 +90,7 @@ interface MedDao {
     @Query("DELETE FROM items WHERE medicineId=:medicineId") suspend fun deleteItemsForMedicine(medicineId: Long)
     @Query("DELETE FROM medicines WHERE id=:id") suspend fun deleteMedicine(id: Long)
     @Query("DELETE FROM periods WHERE id=:id") suspend fun deletePeriod(id: Long)
+    @Query("DELETE FROM periods WHERE id=:id") suspend fun deletePeriodReturningCount(id: Long): Int
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM cards") suspend fun nextCard(): Int
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM groups WHERE cardId=:cardId") suspend fun nextGroup(cardId: Long): Int
     @Query("SELECT COALESCE(MAX(position), -1)+1 FROM (SELECT position FROM items WHERE groupId=:groupId UNION ALL SELECT position FROM dividers WHERE groupId=:groupId)") suspend fun nextItem(groupId: Long): Int
@@ -174,7 +175,13 @@ fun automaticThreeDoseCards(cards: List<NoteCard>): List<Long>? {
 class Repository(val db: MedDatabase, private val today: () -> LocalDate = LocalDate::now) {
     val dao = db.dao()
     val notebook = combine(dao.cards(), dao.groups(), dao.items(), dao.medicines(), dao.periods()) { c, g, i, m, p -> Notebook(c, g, i, m, p) }.combine(dao.reminders()) { n, r -> n.copy(reminders = r) }.combine(dao.dividers()) { n, d -> n.copy(dividers = d) }
-    suspend fun saveCard(value: NoteCard) { if (value.id == 0L) dao.insertCard(value.copy(position = dao.nextCard())) else dao.updateCard(value) }
+    suspend fun saveCard(value: NoteCard) = db.withTransaction {
+        if (value.id == 0L) dao.insertCard(value.copy(position = dao.nextCard()))
+        else {
+            requireNotNull(dao.card(value.id)) { "卡片已被删除" }
+            dao.updateCard(value)
+        }
+    }
     suspend fun saveGroup(value: NoteGroup, reminder: Reminder): Long = db.withTransaction {
         val id = if (value.id == 0L) dao.insertGroup(value.copy(position = dao.nextGroup(value.cardId))) else { dao.updateGroup(value); value.id }
         require(reminder.hour == null && reminder.minute == null || reminder.hour in 0..23 && reminder.minute in 0..59) { "提醒时间无效" }
@@ -371,6 +378,24 @@ class Repository(val db: MedDatabase, private val today: () -> LocalDate = Local
         dao.deleteCard(cardId)
         medicineIds.forEach { endUseIfNoItems(it) }
     }
+    data class DeletedMedicine(val images: List<String>, val affectedGroupIds: List<Long>)
+
+    suspend fun deleteMedicineArchive(medicineId: Long): DeletedMedicine = db.withTransaction {
+        val medicine = requireNotNull(dao.medicine(medicineId)) { "药品已被删除" }
+        val affectedGroupIds = dao.itemsForMedicine(medicineId).map { it.groupId }.distinct()
+        dao.deleteMedicine(medicineId)
+        DeletedMedicine(medicine.photos(), affectedGroupIds)
+    }
+
+    suspend fun deleteDivider(dividerId: Long) = db.withTransaction {
+        requireNotNull(dao.divider(dividerId)) { "分隔条已被删除" }
+        dao.deleteDivider(dividerId)
+    }
+
+    suspend fun deletePeriod(periodId: Long) = db.withTransaction {
+        require(dao.deletePeriodReturningCount(periodId) == 1) { "用药记录已被删除" }
+    }
+
     suspend fun saveDivider(value: NoteDivider): Long = db.withTransaction {
         require(value.text.isNotBlank()) { "请填写分隔文字" }
         requireNotNull(dao.group(value.groupId)) { "大类已被删除" }
