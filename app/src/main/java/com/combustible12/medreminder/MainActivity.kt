@@ -383,8 +383,21 @@ private fun NoteCardView(card: NoteCard, state: Notebook, edit: () -> Unit, addG
                         val item = requireNotNull(entry.item)
                         val med = state.medicines.firstOrNull { it.id == item.medicineId }
                         if (med != null) {
+                            val previousIsDivider = index > 0 && groupItems[index - 1].divider != null
+                            val nextIsDivider = index < groupItems.lastIndex && groupItems[index + 1].divider != null
                             SwipeMedicineActions(item.id, med.starred, med.name, androidx.compose.ui.graphics.lerp(color, Color.White, .85f), { itemAction(item, it) }) {
-                            Row(Modifier.fillMaxWidth().clickable { editItem(item) }.padding(top = if (index == 0) 6.dp else 3.dp, bottom = if (index == groupItems.lastIndex) 6.dp else 3.dp).heightIn(min = 22.5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { editItem(item) }
+                                    .padding(
+                                        top = if (index == 0) 6.dp else if (previousIsDivider) 1.5.dp else 3.dp,
+                                        bottom = if (index == groupItems.lastIndex) 6.dp else if (nextIsDivider) 1.5.dp else 3.dp
+                                    )
+                                    .heightIn(min = 22.5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
                                 Column(Modifier.weight(.45f)) {
                                     Text(med.name + if (med.starred) " ⭐" else "", fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = Ink)
                                 }
